@@ -15,3 +15,10 @@ jobs:
           python-version: "3.13"
       - name: Testar cada rede
         run: python teste_redes.py | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Testar imagens dos tabloides do Assaí (direto e pelo proxy)
+        env:
+          PROXY: ${{ vars.OFERTAS_PROXY }}
+        run: |
+          IMG="https://d2q57q7k4hzryv.cloudfront.net/RPA/v3/173705/campanha-173705-cluster-883-pagina-1.jpeg"
+          echo "--- direto"; curl -s -o /dev/null -D - -A "Mozilla/5.0" "$IMG" | head -12; curl -s -A "Mozilla/5.0" "$IMG" | head -c 300; echo
+          echo "--- pelo proxy"; curl -s -D - -o /dev/null "$PROXY/?url=$(python -c "import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1],safe=''))" "$IMG")" | head -12
