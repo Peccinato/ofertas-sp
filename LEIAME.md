@@ -16,12 +16,29 @@ O navegador abre em http://localhost:8765. Não precisa instalar nada além do P
 
 **https://peccinato.github.io/ofertas-sp/**
 
-- Atualiza sozinha todo dia às 6h (GitHub Actions, arquivo `.github/workflows/publicar.yml`). Para atualizar na hora, abra a aba **Actions** do repositório, clique em **Publicar site** e depois em **Run workflow**.
-- A busca procura nos cerca de 26 mil preços coletados naquele dia, de mais de 150 produtos.
+- **Qualquer CEP, a qualquer hora:** toque em 📍 e digite o CEP. A busca acontece ao vivo nas 11 lojas online, com os preços e a disponibilidade da sua região, e o Assaí mais perto é escolhido automaticamente. O CEP fica salvo no aparelho.
+- **Folhetos viram preços:** todo dia às 6h, um robô do GitHub (`.github/workflows/publicar.yml`) baixa os folhetos do Assaí, Roldão, Akki, Lopes e Max e o Gemini lê os produtos e preços. Para atualizar na hora: aba **Actions** do repositório > **Publicar site** > **Run workflow**.
 - Favoritos e lista ficam salvos no aparelho (no navegador do celular ou do PC).
-- **Trocar o CEP da coleta:** no repositório, vá em Settings > Secrets and variables > Actions > aba **Variables** e crie `OFERTAS_CEP` com o seu CEP (só números). O padrão é 01310-100 (Paulista).
-- **Ler folhetos com IA:** no mesmo lugar, aba **Secrets**, crie `ANTHROPIC_API_KEY` com a sua chave. Cada página de folheto é lida uma vez só.
 - O GitHub pausa tarefas agendadas de repositórios sem nenhuma atividade por 60 dias. Se o site parar de atualizar, é só rodar o workflow manualmente uma vez.
+
+### Como funciona por trás
+
+| Peça | Para quê | Custo |
+|---|---|---|
+| GitHub Pages | hospeda o site | grátis |
+| GitHub Actions | coleta diária de ofertas e folhetos | grátis (repositório público) |
+| Cloudflare Worker (`worker/`) | intermediário (proxy) que deixa o site consultar as lojas com o seu CEP; roda na região de São Paulo porque o Assaí só aceita acessos do Brasil | grátis até 100 mil requisições/dia (cada busca usa ~11) |
+| Gemini (Google) | lê as imagens dos folhetos | grátis, com cota diária |
+
+**Cota do Gemini:** o plano grátis permite poucas leituras por dia em cada modelo (cerca de 20 no modelo principal). O programa usa o "flash" mais novo e, quando a cota acaba, passa para o "flash-lite". Cada página é lida uma vez só; se a cota acabar, o restante fica para o dia seguinte. Os mercados são intercalados para todos receberem leituras.
+
+**Configurações** (no repositório: Settings > Secrets and variables > Actions):
+- Variável `OFERTAS_PROXY`: endereço do proxy (já configurado).
+- Variável `OFERTAS_CEP` (opcional): CEP usado só para a aba **Ofertas** e quando o proxy estiver fora do ar. Padrão: 01310-100.
+- Segredo `GEMINI_API_KEY`: chave grátis em https://aistudio.google.com/apikey (já configurado).
+- Segredo `ANTHROPIC_API_KEY` (opcional): usa o Claude no lugar do Gemini (pago, alguns centavos por página).
+
+**Atualizar o proxy** depois de mudar `worker/proxy.js`: na pasta `worker`, rode `npx.cmd wrangler deploy`.
 
 ## Usar no celular (pelo PC)
 
