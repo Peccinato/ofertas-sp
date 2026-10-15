@@ -91,6 +91,9 @@
   .total b { font-size: 18px; display: block; } .total.melhor { border-color: var(--acento); box-shadow: 0 0 0 1px var(--acento) inset; }
   .total .sub { display: block; }
   h2 { font-size: 15px; margin: 18px 0 8px; }
+  /* versão online: sem coleta pelo navegador */
+  .estatico #btnAtualOf, .estatico #btnAtualFol, .estatico #btnLerFol, .estatico #btnAtualFav, .estatico #lojaAssai,
+  .estatico #lblAssai, .estatico #avisoIA, .estatico #refazer, .estatico #btnCepSalvar, .estatico #inpCep { display: none !important; }
   @media (max-width: 560px) {
     .item { grid-template-columns: 44px 1fr auto; } .item img { width: 44px; height: 44px; }
     .preco { grid-column: 2; text-align: left; } .acoes { grid-row: 1 / span 2; grid-column: 3; }
@@ -175,7 +178,7 @@
   <!-- FOLHETOS -->
   <section class="painel" id="folhetos">
     <div class="barra">
-      <label class="info" style="margin:0">Loja Assaí:</label>
+      <label class="info" id="lblAssai" style="margin:0">Loja Assaí:</label>
       <select id="lojaAssai"></select>
       <button class="btn sec" id="btnAtualFol">Buscar folhetos novos</button>
       <button class="btn" id="btnLerFol">Ler folhetos com IA</button>
@@ -214,13 +217,90 @@ let estado = {produtos: [], ocultos: new Set(), status: null};
 const chave = p => p.mercado + "|" + p.nome;
 const vistos = new Map();   // chave -> produto exibido (para os botões de favoritar / pôr na lista)
 
+// ---------- modo online (GitHub Pages): sem servidor, responde as rotas /api com os dados coletados no dia
+const semAcento = s => (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const Estatico = {
+  ativo: false, produtos: [], folhetos: [], meta: {},
+  async iniciar() {
+    try {
+      const r = await fetch("dados/meta.json", {cache: "no-cache"});
+      if (!r.ok) return;
+      this.meta = await r.json();
+    } catch { return; }
+    this.ativo = true;
+    const [prods, fols] = await Promise.all([
+      fetch("dados/produtos.json", {cache: "no-cache"}).then(r => r.json()),
+      fetch("dados/folhetos.json", {cache: "no-cache"}).then(r => r.json()).catch(() => []),
+    ]);
+    const cols = prods.colunas;
+    this.produtos = prods.linhas.map(l => {
+      const p = Object.fromEntries(cols.map((c, i) => [c, l[i]]));
+      p.nome_busca = semAcento(p.nome + " " + (p.marca || ""));
+      return p;
+    });
+    this.folhetos = fols;
+    document.body.classList.add("estatico");
+  },
+  consultar(q = "", {mercado = "", origem = "", soOfertas = false, limite = 600} = {}) {
+    const raizes = semAcento(q).split(/\s+/).filter(w => w.length >= 2).map(w => {
+      let r = w.length > 4 && w.endsWith("s") ? w.slice(0, -1) : w;
+      return r.length > 4 && "aeo".includes(r.at(-1)) ? r.slice(0, -1) : r;
+    });
+    return this.produtos.filter(p => raizes.every(r => p.nome_busca.includes(r))
+        && (!mercado || p.mercado === mercado) && (!origem || p.origem === origem)
+        && (!soOfertas || p.desconto > 0 || p.origem === "folheto" || p.extra))
+      .sort((a, b) => (a.preco_unidade ?? a.preco) - (b.preco_unidade ?? b.preco)).slice(0, limite);
+  },
+  porChave(k) { return this.produtos.find(p => chave(p) === k) || null; },
+  responder(caminho, corpo) {
+    const u = new URL(caminho, location.href), q = Object.fromEntries(u.searchParams);
+    const custoP = p => p.preco_unidade || p.preco;
+    switch (u.pathname.replace(/^.*\/api\//, "")) {
+      case "status": return {estatico: true, trabalho: {tarefa: "", feito: 0, total: 0, erros: [], fim: 1}, ia: true, ia_motivo: "",
+        contagens: [{n: this.produtos.length}], lojas_assai: [], loja_assai_id: 0,
+        mercados_online: this.meta.mercados_online || [], mercados_folheto: this.meta.mercados_folheto || []};
+      case "buscar": return {produtos: q.q ? this.consultar(q.q) : [], erros: {}};
+      case "ofertas": return {produtos: this.consultar(q.q || "", {mercado: q.mercado, origem: q.origem, soOfertas: true, limite: 2000})};
+      case "folhetos": return {folhetos: this.folhetos};
+      case "local": return corpo ? {erro: "Na versão online o CEP é fixo (definido na coleta diária). Para usar o seu CEP, abra o app no PC."} : (this.meta.local || {endereco: null});
+      case "dados": throw new Error("sem servidor");   // favoritos e lista ficam só no aparelho
+      case "favoritos/precos": {
+        const out = {};
+        for (const f of corpo.favoritos || []) {
+          const atual = this.porChave(f.k);
+          let alts = this.consultar(f.termo || f.nome, {limite: 200}).filter(p => chave(p) !== f.k);
+          let c = p => p.preco;
+          if (atual?.preco_unidade) { alts = alts.filter(p => p.preco_unidade && p.unidade === atual.unidade); c = p => p.preco_unidade; }
+          out[f.k] = {atual, alternativa: alts.length ? alts.reduce((a, b) => c(b) < c(a) ? b : a) : null};
+        }
+        return out;
+      }
+      case "lista/precos": return {itens: (corpo.itens || []).map(it => {
+        const por_mercado = {};
+        for (const p of this.consultar(it.texto || "", {limite: 400}))
+          if (!por_mercado[p.mercado] || custoP(p) < custoP(por_mercado[p.mercado])) por_mercado[p.mercado] = p;
+        const v = Object.values(por_mercado);
+        return {por_mercado, melhor: v.length ? v.reduce((a, b) => custoP(b) < custoP(a) ? b : a) : null,
+                fixo: it.prod ? this.porChave(it.prod.k) : null};
+      })};
+      default: return {erro: "Disponível só no app do PC."};
+    }
+  },
+};
+async function apiFetch(caminho, opts = {}) {
+  if (!Estatico.ativo) return fetch(caminho, opts);
+  const corpo = opts.body ? JSON.parse(opts.body) : (opts.method === "POST" ? {} : null);
+  const dados = Estatico.responder(caminho, corpo);
+  return {ok: true, json: async () => dados};
+}
+
 // ---------- dados do usuário (favoritos e lista): salvos no servidor, com cópia no navegador
 const Dados = {
   d: {favoritos: [], lista: []},
   async carregar() {
     let local = null;
     try { local = JSON.parse(localStorage.getItem("ofertas-dados") || "null"); } catch {}
-    try { this.d = await fetch("/api/dados").then(r => r.json()); } catch { this.d = local || {}; }
+    try { this.d = await apiFetch("/api/dados").then(r => r.json()); } catch { this.d = local || {}; }
     if (!this.d.favoritos && local) this.d = local;
     this.d.favoritos ||= []; this.d.lista ||= [];
     contadores();
@@ -228,7 +308,7 @@ const Dados = {
   salvar() {
     try { localStorage.setItem("ofertas-dados", JSON.stringify(this.d)); } catch {}
     clearTimeout(this._t);
-    this._t = setTimeout(() => fetch("/api/dados", {method: "POST", body: JSON.stringify(this.d)}).catch(() => {}), 300);
+    this._t = setTimeout(() => apiFetch("/api/dados", {method: "POST", body: JSON.stringify(this.d)}).catch(() => {}), 300);
     contadores();
   },
   ehFav(k) { return this.d.favoritos.some(f => f.k === k); },
@@ -324,7 +404,7 @@ $("#ordem").onchange = desenharBusca;
 async function buscar(forcar) {
   const q = $("#q").value.trim(); if (!q) return;
   $("#infoBusca").textContent = "Buscando em todas as redes…"; $("#resultado").innerHTML = ""; $("#avisoBusca").innerHTML = "";
-  const r = await fetch(`/api/buscar?q=${encodeURIComponent(q)}${forcar ? "&forcar=1" : ""}`).then(r => r.json());
+  const r = await apiFetch(`/api/buscar?q=${encodeURIComponent(q)}${forcar ? "&forcar=1" : ""}`).then(r => r.json());
   if (r.erro) { $("#infoBusca").textContent = "Erro: " + r.erro; return; }
   estado.produtos = r.produtos;
   const erros = Object.entries(r.erros || {});
@@ -353,7 +433,7 @@ $("#filtroMercados").onclick = e => {
 let ofertas = [];
 async function carregarOfertas() {
   const p = new URLSearchParams({mercado: $("#mercadoOf").value, origem: $("#origemOf").value});
-  ofertas = (await fetch("/api/ofertas?" + p).then(r => r.json())).produtos || [];
+  ofertas = (await apiFetch("/api/ofertas?" + p).then(r => r.json())).produtos || [];
   desenharOfertas();
 }
 function desenharOfertas() {
@@ -367,11 +447,11 @@ function desenharOfertas() {
 }
 ["#mercadoOf", "#origemOf"].forEach(s => $(s).onchange = carregarOfertas);
 $("#ordemOf").onchange = desenharOfertas; $("#qOf").oninput = desenharOfertas;
-$("#btnAtualOf").onclick = async () => { await fetch("/api/ofertas/atualizar", {method: "POST"}); acompanhar(); };
+$("#btnAtualOf").onclick = async () => { await apiFetch("/api/ofertas/atualizar", {method: "POST"}); acompanhar(); };
 
 // ---------- folhetos
 async function carregarFolhetos() {
-  const r = await fetch("/api/folhetos").then(r => r.json());
+  const r = await apiFetch("/api/folhetos").then(r => r.json());
   const fs = r.folhetos || [];
   $("#infoFol").textContent = fs.length ? `${fs.length} páginas de folhetos vigentes. Clique numa página para abrir em tamanho real.` : "Nenhum folheto carregado. Clique em “Buscar folhetos novos”.";
   $("#gradeFol").innerHTML = fs.map(f => {
@@ -388,7 +468,7 @@ async function carregarFolhetos() {
 $("#btnAtualFol").onclick = async () => {
   $("#btnAtualFol").disabled = true; $("#infoFol").textContent = "Buscando folhetos…";
   const sel = $("#lojaAssai").selectedOptions[0];
-  const r = await fetch("/api/folhetos/atualizar", {method: "POST", body: JSON.stringify(
+  const r = await apiFetch("/api/folhetos/atualizar", {method: "POST", body: JSON.stringify(
     {loja_assai_id: sel ? +sel.value : 0, loja_assai: sel ? sel.textContent.replace(/\s*\([\d.,]+ km\)$/, "") : ""})}).then(r => r.json());
   $("#btnAtualFol").disabled = false;
   const erros = Object.entries(r.erros || {});
@@ -396,7 +476,7 @@ $("#btnAtualFol").onclick = async () => {
   carregarFolhetos();
 };
 $("#btnLerFol").onclick = async () => {
-  const r = await fetch("/api/folhetos/ler", {method: "POST", body: "{}"}).then(r => r.json());
+  const r = await apiFetch("/api/folhetos/ler", {method: "POST", body: "{}"}).then(r => r.json());
   if (r.erro) { $("#avisoIA").innerHTML = `<div class="aviso">${esc(r.erro)}</div>`; return; }
   acompanhar();
 };
@@ -410,7 +490,7 @@ async function carregarFavoritos() {
     $("#listaFav").innerHTML = ""; return;
   }
   $("#infoFav").textContent = "Carregando preços…";
-  const r = await fetch("/api/favoritos/precos", {method: "POST", body: JSON.stringify({favoritos: favs})}).then(r => r.json());
+  const r = await apiFetch("/api/favoritos/precos", {method: "POST", body: JSON.stringify({favoritos: favs})}).then(r => r.json());
   let linhas = favs.map(f => ({f, ...(r[f.k] || {})}));
   const ord = $("#ordemFav").value;
   if (ord === "oferta") linhas.sort((a, b) => ((b.atual?.desconto || 0) - (a.atual?.desconto || 0)));
@@ -437,7 +517,7 @@ $("#ordemFav").onchange = carregarFavoritos;
 $("#btnAtualFav").onclick = async () => {
   const termos = Dados.d.favoritos.map(f => f.termo);
   if (!termos.length) return;
-  await fetch("/api/favoritos/atualizar", {method: "POST", body: JSON.stringify({termos})}); acompanhar();
+  await apiFetch("/api/favoritos/atualizar", {method: "POST", body: JSON.stringify({termos})}); acompanhar();
 };
 
 // ---------- lista de compras
@@ -473,14 +553,17 @@ function desenharTotais() {
     const pr = precosLista[i.id];
     const usado = pr.fixo || pr.melhor;
     if (usado) { melhorTotal += usado.preco * i.qtd; achados++; }
+    // compara a mesma quantidade: se o item é "arroz 5kg", um mercado que só tem 1kg entra com o preço de 5kg
+    const qRef = usado && usado.preco_unidade ? usado.preco / usado.preco_unidade : null;
     for (const [m, p] of Object.entries(pr.por_mercado || {})) {
+      const mesmo = qRef && p.preco_unidade && p.unidade === usado.unidade;
       mercados[m] ||= {total: 0, n: 0};
-      mercados[m].total += p.preco * i.qtd; mercados[m].n++;
+      mercados[m].total += (mesmo ? p.preco_unidade * qRef : p.preco) * i.qtd; mercados[m].n++;
     }
   }
   const ranking = Object.entries(mercados).sort((a, b) => (b[1].n - a[1].n) || (a[1].total - b[1].total));
   $("#tituloTotais").hidden = false;
-  $("#infoTotais").textContent = `Para ${itens.length} itens pendentes. Cada mercado entra com a opção mais barata (por kg/L) que ele tem de cada item.`;
+  $("#infoTotais").textContent = `Para ${itens.length} itens pendentes. Cada mercado entra com a opção mais barata (por kg/L) que ele tem de cada item, na mesma quantidade do item escolhido.`;
   $("#totais").innerHTML =
     `<div class="total melhor"><span class="sub">Comprando o mais barato de cada item</span><b>${brl(melhorTotal)}</b><span class="sub">${achados} de ${itens.length} itens · vários mercados</span></div>` +
     ranking.map(([m, t], idx) => `<div class="total"><span class="tag" style="background:${CORES[m] || "#555"}">${esc(m)}</span>
@@ -493,7 +576,7 @@ async function calcularLista() {
   if (!itens.length) return desenharLista();
   const meu = ++calcId;
   $("#infoLista").textContent = `Buscando preços de ${itens.length} item(ns) em todas as redes…`;
-  const r = await fetch("/api/lista/precos", {method: "POST", body: JSON.stringify({itens: itens.map(i => ({texto: i.texto, prod: i.prod}))})}).then(r => r.json());
+  const r = await apiFetch("/api/lista/precos", {method: "POST", body: JSON.stringify({itens: itens.map(i => ({texto: i.texto, prod: i.prod}))})}).then(r => r.json());
   if (meu !== calcId) return;
   (r.itens || []).forEach((res, n) => precosLista[itens[n].id] = {...res, calculado: true});
   $("#infoLista").textContent = "";
@@ -529,7 +612,8 @@ function mostrarCep(info) {
   if (!e) { $("#resumoCep").innerHTML = ""; return; }
   const reg = Object.entries(info.redes_regionalizadas || {}).filter(([, v]) => v).map(([m]) => m);
   const assai = (e.assai || [])[0];
-  $("#resumoCep").innerHTML = `Atual: ${esc([e.rua, e.bairro, e.cidade].filter(Boolean).join(", "))}<br>
+  $("#resumoCep").innerHTML = (Estatico.ativo ? "<b>Na versão online o CEP é fixo</b>: os preços são coletados uma vez por dia para a região abaixo. Para usar outro CEP, abra o app no PC.<br><br>" : "") +
+    `Atual: ${esc([e.rua, e.bairro, e.cidade].filter(Boolean).join(", "))}<br>
     Preços ajustados para sua região: ${esc(reg.join(", ") || "nenhuma")}${info.pao_de_acucar ? `, Pão de Açúcar (loja ${esc(info.pao_de_acucar)})` : "<br>Pão de Açúcar não entrega neste CEP; mostrando a loja padrão."}
     ${assai ? `<br>Assaí mais perto: ${esc(assai.nome)} (${assai.km} km)` : ""}`;
 }
@@ -539,7 +623,7 @@ $("#inpCep").oninput = e => { const d = e.target.value.replace(/\D/g, "").slice(
 $("#formCep").onsubmit = async e => {
   e.preventDefault();
   $("#btnCepSalvar").disabled = true; $("#btnCepSalvar").textContent = "Localizando…"; $("#erroCep").hidden = true;
-  const r = await fetch("/api/local", {method: "POST", body: JSON.stringify({cep: $("#inpCep").value})}).then(r => r.json()).catch(() => ({erro: "sem conexão"}));
+  const r = await apiFetch("/api/local", {method: "POST", body: JSON.stringify({cep: $("#inpCep").value})}).then(r => r.json()).catch(() => ({erro: "sem conexão"}));
   $("#btnCepSalvar").disabled = false; $("#btnCepSalvar").textContent = "Usar este CEP";
   if (r.erro) { $("#erroCep").textContent = r.erro; $("#erroCep").hidden = false; return; }
   mostrarCep(r); $("#dlgCep").close();
@@ -556,7 +640,7 @@ function montarLojasAssai(s) {
 // ---------- status / progresso
 let timer = null;
 async function status() {
-  const s = await fetch("/api/status").then(r => r.json()); estado.status = s;
+  const s = await apiFetch("/api/status").then(r => r.json()); estado.status = s;
   const t = s.trabalho, rodando = t.tarefa && !t.fim;
   const barra = rodando ? `<div class="info">${esc(t.tarefa)}: ${t.feito}/${t.total}</div><div class="progresso"><i style="width:${t.total ? 100 * t.feito / t.total : 5}%"></i></div>` : "";
   const alvo = t.tarefa.includes("folheto") ? "#progFol" : "#progOf";
@@ -577,8 +661,13 @@ async function status() {
 function acompanhar() { if (!timer) timer = setInterval(status, 1500); status(); }
 
 (async () => {
+  await Estatico.iniciar();
+  if (Estatico.ativo && Estatico.meta.gerado_em) {
+    const d = new Date(Estatico.meta.gerado_em);
+    $("#infoBusca").textContent = `Preços coletados em ${d.toLocaleDateString("pt-BR")} às ${d.toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}. Atualiza sozinho todo dia.`;
+  }
   await Dados.carregar();
-  fetch("/api/local").then(r => r.json()).then(info => { mostrarCep(info); if (!info.endereco) $("#btnCep").click(); }).catch(() => {});
+  apiFetch("/api/local").then(r => r.json()).then(info => { mostrarCep(info); if (!info.endereco) $("#btnCep").click(); }).catch(() => {});
   const s = await status();
   montarLojasAssai(s);
   $("#mercadoOf").innerHTML += [...s.mercados_online, ...s.mercados_folheto].map(m => `<option>${esc(m)}</option>`).join("");

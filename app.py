@@ -91,12 +91,12 @@ def atualizar_folhetos():
     return erros
 
 
-def ler_folheto(img):
+def ler_folheto(img, itens=None):
     f = next((x for x in db.listar_folhetos(False) if x["imagem"] == img), None)
     if not f:
         return
     try:
-        itens = extrator_ia.extrair(img)
+        itens = extrator_ia.extrair(img) if itens is None else itens
     except Exception as e:
         db.status_folheto(img, "erro", str(e)[:300])
         raise
@@ -114,7 +114,7 @@ def ler_folheto(img):
     db.status_folheto(img, "lido", "", len(prods))
 
 
-def definir_cep(cep):
+def definir_cep(cep, folhetos_em_segundo_plano=True):
     """Resolve o CEP, descobre a região de cada rede e o Assaí mais próximo."""
     end = local.resolver_cep(cep)
     reg = local.regioes(end["cep"])
@@ -132,7 +132,8 @@ def definir_cep(cep):
         db.set_config("loja_assai", proximas[0]["nome"])
         db.set_config("loja_assai_id", str(proximas[0]["id"]))
     db.limpar_precos_site()
-    threading.Thread(target=atualizar_folhetos, daemon=True).start()
+    if folhetos_em_segundo_plano:
+        threading.Thread(target=atualizar_folhetos, daemon=True).start()
     return info_local()
 
 

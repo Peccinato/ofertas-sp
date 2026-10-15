@@ -1,0 +1,47 @@
+name: Publicar site
+
+on:
+  schedule:
+    - cron: "0 9 * * *"   # todo dia às 06:00 de São Paulo
+  workflow_dispatch:       # botão "Run workflow" para atualizar na hora
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  coletar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Instalar leitor de folhetos (IA)
+        run: pip install --quiet anthropic
+      - name: Coletar preços e gerar o site
+        env:
+          OFERTAS_CEP: ${{ vars.OFERTAS_CEP }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+        run: python gerar_site.py
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  publicar:
+    needs: coletar
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

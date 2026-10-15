@@ -2,8 +2,8 @@ name: Testar redes
 
 on:
   workflow_dispatch:
-  push:
-    paths: ["coletores/**", "teste_redes.py", ".github/workflows/teste-redes.yml"]
+  # push:
+    # paths: ["coletores/**", "teste_redes.py", ".github/workflows/teste-redes.yml"]
 
 jobs:
   testar:

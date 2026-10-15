@@ -6,7 +6,7 @@ import time
 
 from coletores.base import sem_acento
 
-ARQUIVO = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ofertas.db")
+ARQUIVO = os.environ.get("OFERTAS_DB") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "ofertas.db")
 _lock = threading.Lock()
 
 CAMPOS = ["mercado", "nome", "preco", "preco_de", "marca", "imagem", "url", "origem", "validade",
