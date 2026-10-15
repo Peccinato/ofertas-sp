@@ -34,8 +34,8 @@ def _ofertas_assai():
     return http_json(url).get("ofertas", [])
 
 
-def folhetos_assai(loja="Mooca"):
-    loja_id = ASSAI_LOJAS_SP.get(loja, 260)
+def folhetos_assai(loja="Mooca", loja_id=None):
+    loja_id = int(loja_id) if loja_id else ASSAI_LOJAS_SP.get(loja, 260)
     hoje = date.today()
     out = []
     for o in _ofertas_assai():
@@ -154,9 +154,9 @@ def folhetos_max(loja=120):
     return out
 
 
-def todos_folhetos(loja_assai="Mooca"):
+def todos_folhetos(loja_assai="Mooca", loja_assai_id=None):
     out, erros = [], {}
-    for nome, f in (("Assaí", lambda: folhetos_assai(loja_assai)), ("Roldão", folhetos_roldao),
+    for nome, f in (("Assaí", lambda: folhetos_assai(loja_assai, loja_assai_id)), ("Roldão", folhetos_roldao),
                     ("Akki", folhetos_akki), ("Lopes", folhetos_lopes), ("Max Atacadista", folhetos_max)):
         try:
             out += f()

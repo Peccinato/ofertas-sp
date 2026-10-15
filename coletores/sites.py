@@ -18,8 +18,14 @@ VTEX = {
 }
 
 
+# Região do usuário (definida pelo CEP em coletores/local.py): host VTEX -> regionId, loja do Pão de Açúcar
+REGIAO = {"vtex": {}, "gpa_loja": None}
+
+
 def buscar_vtex(mercado, host, termo, n=24):
     url = f"https://{host}/api/io/_v/api/intelligent-search/product_search/?query={quote(termo)}&count={n}&locale=pt-BR"
+    if REGIAO["vtex"].get(host):
+        url += "&regionId=" + quote(REGIAO["vtex"][host])
     d = http_json(url)
     out = []
     for p in d.get("products", []):
@@ -42,7 +48,7 @@ def buscar_vtex(mercado, host, termo, n=24):
 
 def buscar_pao_de_acucar(termo, n=24):
     body = {"terms": termo, "page": 1, "sortBy": "relevance", "resultsPerPage": n, "allowRedirect": False,
-            "storeId": 461, "department": "ecom", "customerPlus": True, "partner": "linx"}
+            "storeId": REGIAO["gpa_loja"] or 461, "department": "ecom", "customerPlus": True, "partner": "linx"}
     d = http_json("https://api.vendas.gpa.digital/pa/search/search", body)
     out = []
     for p in d.get("products", []):

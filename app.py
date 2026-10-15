@@ -17,12 +17,13 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
 import db
-from coletores import extrator_ia
+from coletores import extrator_ia, local
 from coletores.base import Produto
 from coletores.folhetos import ASSAI_LOJAS_SP, todos_folhetos
-from coletores.sites import fontes
+from coletores.sites import VTEX, fontes
 
-PORTA = int(os.environ.get("OFERTAS_PORTA", "8765"))
+PORTA = int(sys.argv[sys.argv.index("--porta") + 1]) if "--porta" in sys.argv else \
+    int(os.environ.get("OFERTAS_PORTA") or os.environ.get("PORT") or "8765")
 PASTA = os.path.dirname(os.path.abspath(__file__))
 
 # Cesta de itens usada para montar a aba "Ofertas" a partir das lojas online
@@ -84,7 +85,7 @@ def atualizar_ofertas():
 
 
 def atualizar_folhetos():
-    folhetos, erros = todos_folhetos(db.config("loja_assai", "Mooca"))
+    folhetos, erros = todos_folhetos(db.config("loja_assai", "Mooca"), db.config("loja_assai_id") or None)
     db.limpar_vencidos()
     db.salvar_folhetos(folhetos)
     return erros
@@ -111,6 +112,105 @@ def ler_folheto(img):
     db.apagar_da_fonte(img)
     db.salvar_produtos(prods, fonte=img)
     db.status_folheto(img, "lido", "", len(prods))
+
+
+def definir_cep(cep):
+    """Resolve o CEP, descobre a região de cada rede e o Assaí mais próximo."""
+    end = local.resolver_cep(cep)
+    reg = local.regioes(end["cep"])
+    proximas = []
+    if end["lat"] is not None:
+        try:
+            proximas = local.assai_mais_proximas(end["lat"], end["lon"])
+        except Exception:
+            pass
+    end["assai"] = proximas
+    db.set_config("endereco", json.dumps(end, ensure_ascii=False))
+    db.set_config("regiao", json.dumps(reg))
+    local.aplicar(reg)
+    if proximas:
+        db.set_config("loja_assai", proximas[0]["nome"])
+        db.set_config("loja_assai_id", str(proximas[0]["id"]))
+    db.limpar_precos_site()
+    threading.Thread(target=atualizar_folhetos, daemon=True).start()
+    return info_local()
+
+
+def info_local():
+    end = json.loads(db.config("endereco", "null") or "null")
+    reg = json.loads(db.config("regiao", "null") or "null") or {}
+    if not end:
+        return {"endereco": None}
+    vtex = reg.get("vtex") or {}
+    redes = {nome: bool(vtex.get(host)) for nome, host in VTEX.items()}
+    gpa = reg.get("gpa")
+    return {"endereco": end, "redes_regionalizadas": redes,
+            "pao_de_acucar": gpa["nome"] if gpa else None}
+
+
+def lojas_assai_menu():
+    """Lojas para o seletor: as mais próximas do CEP primeiro, depois as da capital."""
+    end = json.loads(db.config("endereco", "null") or "null") or {}
+    menu = [{"nome": f"{l['nome']} ({l['km']} km)", "id": l["id"]} for l in end.get("assai") or []]
+    vistos = {m["id"] for m in menu}
+    menu += [{"nome": n, "id": i} for n, i in sorted(ASSAI_LOJAS_SP.items()) if i not in vistos]
+    return menu
+
+
+def precos_favoritos(favs):
+    """Preço atual de cada favorito + a opção mais barata (por kg/L) em qualquer rede."""
+    atuais = db.produtos_por_chave([[f["mercado"], f["nome"]] for f in favs])
+    out = {}
+    for f in favs:
+        k = f"{f['mercado']}|{f['nome']}"
+        alts = [p for p in db.consultar(f.get("termo") or f["nome"], limite=200, max_idade_h=24 * 7)
+                if f"{p['mercado']}|{p['nome']}" != k]
+        atual = atuais.get(k)
+        if atual and atual.get("preco_unidade"):
+            # compara por kg/L só com produtos medidos na mesma unidade
+            alts = [p for p in alts if p["preco_unidade"] and p["unidade"] == atual["unidade"]]
+            chave = lambda p: p["preco_unidade"]
+        else:
+            chave = lambda p: p["preco"]
+        out[k] = {"atual": atual, "alternativa": min(alts, key=chave) if alts else None}
+    return out
+
+
+def precos_lista(itens):
+    """Para cada item da lista: opção mais barata no geral e em cada mercado."""
+    out = []
+    for it in itens:
+        texto = (it.get("texto") or "").strip()
+        if not texto:
+            out.append({"melhor": None, "por_mercado": {}})
+            continue
+        if not db.busca_recente(texto):
+            buscar_ao_vivo(texto)
+        por_mercado = {}
+        for p in db.consultar(texto, limite=400, max_idade_h=24 * 7):
+            m = p["mercado"]
+            if m not in por_mercado or _custo(p) < _custo(por_mercado[m]):
+                por_mercado[m] = p
+        melhor = min(por_mercado.values(), key=_custo) if por_mercado else None
+        fixo = None
+        if it.get("prod"):  # produto escolhido pelo usuário (veio do botão 🛒)
+            fixo = db.produtos_por_chave([[it["prod"]["mercado"], it["prod"]["nome"]]]).get(it["prod"]["k"])
+        out.append({"melhor": melhor, "por_mercado": por_mercado, "fixo": fixo})
+    return out
+
+
+def _custo(p):
+    # compara por kg/L quando dá; sem quantidade no nome, pelo preço da embalagem
+    return p["preco_unidade"] if p.get("preco_unidade") else p["preco"]
+
+
+def atualizar_termos(termos):
+    def f():
+        for t in termos:
+            erros = buscar_ao_vivo(t)
+            trabalho["erros"] += [f"{m}: {e}" for m, e in erros.items()]
+            trabalho["feito"] += 1
+    return _rodar("Atualizando preços dos favoritos", len(termos), f)
 
 
 def ler_folhetos(imagens):
@@ -162,11 +262,16 @@ class Handler(SimpleHTTPRequestHandler):
                                                             origem=q.get("origem", ""), limite=2000)})
             if u.path == "/api/folhetos":
                 return self._json({"folhetos": db.listar_folhetos()})
+            if u.path == "/api/local":
+                return self._json(info_local())
+            if u.path == "/api/dados":
+                return self._json(json.loads(db.config("dados", "{}") or "{}"))
             if u.path == "/api/status":
                 ok, motivo = extrator_ia.disponivel()
                 return self._json({
                     "trabalho": trabalho, "ia": ok, "ia_motivo": motivo, "contagens": db.contagens(),
-                    "loja_assai": db.config("loja_assai", "Mooca"), "lojas_assai": sorted(ASSAI_LOJAS_SP),
+                    "loja_assai_id": int(db.config("loja_assai_id") or ASSAI_LOJAS_SP.get(db.config("loja_assai", "Mooca"), 260)),
+                    "lojas_assai": lojas_assai_menu(),
                     "mercados_online": [n for n, _ in fontes()], "mercados_folheto": ["Assaí", "Roldão", "Akki", "Lopes", "Max Atacadista"],
                 })
         except Exception as e:
@@ -181,9 +286,25 @@ class Handler(SimpleHTTPRequestHandler):
             corpo = self._corpo()
             if u.path == "/api/ofertas/atualizar":
                 return self._json({"iniciado": atualizar_ofertas()})
+            if u.path == "/api/local":
+                try:
+                    return self._json(definir_cep(corpo.get("cep", "")))
+                except ValueError as e:
+                    return self._json({"erro": str(e)}, 400)
+            if u.path == "/api/dados":
+                db.set_config("dados", json.dumps(corpo, ensure_ascii=False))
+                return self._json({"ok": True})
+            if u.path == "/api/favoritos/precos":
+                return self._json(precos_favoritos(corpo.get("favoritos") or []))
+            if u.path == "/api/favoritos/atualizar":
+                termos = sorted({t for t in corpo.get("termos") or [] if t})
+                return self._json({"iniciado": atualizar_termos(termos)})
+            if u.path == "/api/lista/precos":
+                return self._json({"itens": precos_lista(corpo.get("itens") or [])})
             if u.path == "/api/folhetos/atualizar":
-                if "loja_assai" in corpo:
-                    db.set_config("loja_assai", corpo["loja_assai"])
+                if corpo.get("loja_assai_id"):
+                    db.set_config("loja_assai_id", str(corpo["loja_assai_id"]))
+                    db.set_config("loja_assai", corpo.get("loja_assai", ""))
                 return self._json({"erros": atualizar_folhetos(), "folhetos": db.listar_folhetos()})
             if u.path == "/api/folhetos/ler":
                 ok, motivo = extrator_ia.disponivel()
@@ -210,6 +331,7 @@ def ip_local():
 
 def main():
     db.criar()
+    local.aplicar(json.loads(db.config("regiao", "null") or "null"))
     if "--atualizar" in sys.argv:
         print("Atualizando folhetos...", atualizar_folhetos() or "ok")
         for i, termo in enumerate(CESTA, 1):
@@ -223,7 +345,12 @@ def main():
                         print("erro:", f["imagem"], e)
         return
     rede = "--rede" in sys.argv
-    srv = ThreadingHTTPServer(("0.0.0.0" if rede else "127.0.0.1", PORTA), Handler)
+    # no Windows, reutilizar o endereço deixa dois servidores "dividirem" a porta sem erro
+    ThreadingHTTPServer.allow_reuse_address = os.name != "nt"
+    try:
+        srv = ThreadingHTTPServer(("0.0.0.0" if rede else "127.0.0.1", PORTA), Handler)
+    except OSError:
+        sys.exit(f"A porta {PORTA} já está em uso (o app já está aberto?). Use: py app.py --porta 8766")
     url = f"http://localhost:{PORTA}"
     print(f"Ofertas SP rodando em {url}  (Ctrl+C para sair)")
     if rede:

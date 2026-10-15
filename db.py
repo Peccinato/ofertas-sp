@@ -152,3 +152,22 @@ def contagens():
     with conectar() as con:
         rows = con.execute("SELECT mercado, origem, COUNT(*) n, MAX(atualizado_em) t FROM produtos GROUP BY mercado, origem")
         return [dict(r) for r in rows]
+
+
+def limpar_precos_site():
+    """Ao trocar de CEP os preços online mudam: descarta os antigos e o cache de buscas."""
+    with _lock, conectar() as con:
+        con.execute("DELETE FROM produtos WHERE origem = 'site'")
+        con.execute("DELETE FROM buscas")
+
+
+def produtos_por_chave(chaves):
+    """chaves: lista de [mercado, nome] -> {"mercado|nome": produto atual}."""
+    out = {}
+    with conectar() as con:
+        for mercado, nome in chaves:
+            r = con.execute("SELECT * FROM produtos WHERE mercado = ? AND nome = ? ORDER BY atualizado_em DESC LIMIT 1",
+                            (mercado, nome)).fetchone()
+            if r:
+                out[f"{mercado}|{nome}"] = dict(r)
+    return out

@@ -60,18 +60,54 @@
   .progresso { height: 6px; background: var(--linha); border-radius: 3px; overflow: hidden; margin: 8px 0; }
   .progresso i { display: block; height: 100%; background: var(--acento); width: 0; transition: width .4s; }
   .vazio { text-align: center; color: var(--sub); padding: 40px 0; }
+  /* ações do item: favoritar e pôr na lista */
+  .item { grid-template-columns: 56px 1fr auto auto; }
+  .acoes { display: flex; flex-direction: column; gap: 4px; }
+  .acao { font: inherit; font-size: 17px; line-height: 1; width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--linha);
+          background: var(--card); color: var(--sub); cursor: pointer; }
+  .acao.on { color: #e0a100; border-color: #e0a100; }
+  .acao.ok { color: var(--acento); border-color: var(--acento); }
+  .cep { margin-left: auto; font: inherit; font-size: 13px; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--linha);
+         background: var(--card); color: var(--txt); cursor: pointer; }
+  .cep.vazio-cep { border-color: var(--verm); color: var(--verm); }
+  dialog { border: 1px solid var(--linha); border-radius: var(--raio); background: var(--card); color: var(--txt); padding: 18px; width: min(420px, calc(100vw - 32px)); }
+  dialog::backdrop { background: rgba(0,0,0,.4); }
+  dialog h3 { margin: 0 0 6px; } dialog input { width: 100%; font-size: 18px; letter-spacing: .05em; margin: 10px 0; }
+  .sub { color: var(--sub); font-size: 13px; }
+  .resumo-cep { margin-top: 10px; font-size: 13px; color: var(--sub); }
+  /* favoritos */
+  .fav-alt { font-size: 12.5px; margin-top: 4px; color: var(--acento); }
+  .fav-alt.pior { color: var(--sub); }
+  .var-up { color: var(--verm); font-size: 12px; } .var-down { color: var(--acento); font-size: 12px; }
+  /* lista de compras */
+  .linha-lista { display: grid; grid-template-columns: auto 64px 1fr auto auto; gap: 10px; align-items: center; background: var(--card);
+                 border: 1px solid var(--linha); border-radius: var(--raio); padding: 10px 12px; }
+  .linha-lista.feito { opacity: .5; } .linha-lista.feito .txt { text-decoration: line-through; }
+  .linha-lista input[type=number] { width: 64px; font: inherit; padding: 6px 8px; border: 1px solid var(--linha); border-radius: 8px; background: var(--card); color: var(--txt); }
+  .linha-lista input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--acento); }
+  .linha-lista .txt { font-weight: 500; } .linha-lista .onde { font-size: 12.5px; color: var(--sub); margin-top: 2px; }
+  .totais { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin: 14px 0; }
+  .total { background: var(--card); border: 1px solid var(--linha); border-radius: var(--raio); padding: 10px 12px; }
+  .total b { font-size: 18px; display: block; } .total.melhor { border-color: var(--acento); box-shadow: 0 0 0 1px var(--acento) inset; }
+  .total .sub { display: block; }
+  h2 { font-size: 15px; margin: 18px 0 8px; }
   @media (max-width: 560px) {
-    .item { grid-template-columns: 44px 1fr; } .item img { width: 44px; height: 44px; }
-    .preco { grid-column: 2; text-align: left; }
+    .item { grid-template-columns: 44px 1fr auto; } .item img { width: 44px; height: 44px; }
+    .preco { grid-column: 2; text-align: left; } .acoes { grid-row: 1 / span 2; grid-column: 3; }
+    .linha-lista { grid-template-columns: auto 56px 1fr auto; } .linha-lista .valor { grid-column: 3; }
+    nav { overflow-x: auto; } nav button { white-space: nowrap; }
   }
 </style>
 </head>
 <body>
 <header>
-  <div class="topo"><h1>Ofertas <span>SP</span></h1><span class="info" id="resumo" style="margin:0"></span></div>
+  <div class="topo"><h1>Ofertas <span>SP</span></h1><span class="info" id="resumo" style="margin:0"></span>
+    <button class="cep vazio-cep" id="btnCep" type="button">📍 Informe seu CEP</button></div>
   <nav>
     <button class="ativo" data-aba="comparar">Comparar preços</button>
     <button data-aba="ofertas">Ofertas</button>
+    <button data-aba="favoritos">★ Favoritos <span id="nFav"></span></button>
+    <button data-aba="lista">🛒 Lista <span id="nLista"></span></button>
     <button data-aba="folhetos">Folhetos</button>
   </nav>
 </header>
@@ -107,6 +143,35 @@
     <div class="lista" id="listaOf"></div>
   </section>
 
+  <!-- FAVORITOS -->
+  <section class="painel" id="favoritos">
+    <div class="barra">
+      <select id="ordemFav"><option value="nome">Ordem: nome</option><option value="oferta">Em oferta primeiro</option><option value="mercado">Por mercado</option></select>
+      <button class="btn sec" id="btnAtualFav">Atualizar preços dos favoritos</button>
+    </div>
+    <div id="progFav"></div>
+    <div class="info" id="infoFav"></div>
+    <div class="lista" id="listaFav"></div>
+  </section>
+
+  <!-- LISTA DE COMPRAS -->
+  <section class="painel" id="lista">
+    <form class="barra" id="formLista">
+      <input type="search" id="novoItem" placeholder="Adicionar item (ex.: arroz 5kg, leite integral 1L)">
+      <input type="number" id="novaQtd" value="1" min="1" style="width:70px;font:inherit;padding:10px;border:1px solid var(--linha);border-radius:10px;background:var(--card);color:var(--txt)">
+      <button class="btn">Adicionar</button>
+    </form>
+    <div class="barra">
+      <button class="btn sec" id="btnCalcLista" type="button">Recalcular preços</button>
+      <button class="btn sec" id="btnLimparFeitos" type="button">Remover itens marcados</button>
+    </div>
+    <div class="info" id="infoLista"></div>
+    <div class="lista" id="itensLista"></div>
+    <h2 id="tituloTotais" hidden>Quanto sai em cada mercado</h2>
+    <div class="info" id="infoTotais"></div>
+    <div class="totais" id="totais"></div>
+  </section>
+
   <!-- FOLHETOS -->
   <section class="painel" id="folhetos">
     <div class="barra">
@@ -122,6 +187,20 @@
   </section>
 </main>
 
+<dialog id="dlgCep">
+  <form method="dialog" id="formCep">
+    <h3>📍 Seu CEP</h3>
+    <div class="sub">Os preços e a disponibilidade das lojas online mudam conforme a região. O CEP também escolhe o Assaí mais perto de você.</div>
+    <input id="inpCep" inputmode="numeric" placeholder="00000-000" maxlength="9" autocomplete="postal-code">
+    <div id="erroCep" class="aviso" hidden></div>
+    <div class="barra" style="justify-content:flex-end;margin:0">
+      <button class="btn sec" value="cancel" type="button" id="btnCepCancelar">Cancelar</button>
+      <button class="btn" id="btnCepSalvar" type="submit">Usar este CEP</button>
+    </div>
+    <div class="resumo-cep" id="resumoCep"></div>
+  </form>
+</dialog>
+
 <script>
 const CORES = {"Pão de Açúcar":"#b5121b","Tenda Atacado":"#e85d04","Atacadão":"#d62828","Sam's Club":"#0067a0",
   "Mambo":"#2b9348","Oba Hortifruti":"#6a994e","Coop":"#1d4e89","Savegnago":"#c1121f","Zaffari":"#7b2cbf",
@@ -132,6 +211,66 @@ const $ = s => document.querySelector(s);
 const brl = v => v == null ? "" : v.toLocaleString("pt-BR", {style:"currency", currency:"BRL"});
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 let estado = {produtos: [], ocultos: new Set(), status: null};
+const chave = p => p.mercado + "|" + p.nome;
+const vistos = new Map();   // chave -> produto exibido (para os botões de favoritar / pôr na lista)
+
+// ---------- dados do usuário (favoritos e lista): salvos no servidor, com cópia no navegador
+const Dados = {
+  d: {favoritos: [], lista: []},
+  async carregar() {
+    let local = null;
+    try { local = JSON.parse(localStorage.getItem("ofertas-dados") || "null"); } catch {}
+    try { this.d = await fetch("/api/dados").then(r => r.json()); } catch { this.d = local || {}; }
+    if (!this.d.favoritos && local) this.d = local;
+    this.d.favoritos ||= []; this.d.lista ||= [];
+    contadores();
+  },
+  salvar() {
+    try { localStorage.setItem("ofertas-dados", JSON.stringify(this.d)); } catch {}
+    clearTimeout(this._t);
+    this._t = setTimeout(() => fetch("/api/dados", {method: "POST", body: JSON.stringify(this.d)}).catch(() => {}), 300);
+    contadores();
+  },
+  ehFav(k) { return this.d.favoritos.some(f => f.k === k); },
+  naLista(k) { return this.d.lista.some(i => i.prod && i.prod.k === k); },
+};
+function contadores() {
+  $("#nFav").textContent = Dados.d.favoritos.length ? `(${Dados.d.favoritos.length})` : "";
+  const pend = Dados.d.lista.filter(i => !i.feito).length;
+  $("#nLista").textContent = pend ? `(${pend})` : "";
+}
+
+// termo de busca genérico a partir do nome: "Arroz Agulhinha Tipo 1 CAMIL 5kg" -> "arroz agulhinha 5kg"
+function termoDe(nome) {
+  const palavras = nome.toLowerCase().replace(/[^\p{L}\p{N}\s,.]/gu, " ").split(/\s+/).filter(Boolean);
+  const tam = (nome.match(/\d+(?:[.,]\d+)?\s*(?:kg|g|ml|l|litros?)\b/i) || [""])[0].replace(/\s+/g, "").toLowerCase();
+  const base = palavras.filter(w => w.length > 2 && !/\d/.test(w) && !["tipo", "pacote", "com", "sem", "para", "de", "do", "da"].includes(w)).slice(0, 2);
+  return [...base, tam].filter(Boolean).join(" ");
+}
+
+function alternarFavorito(p, termo) {
+  const k = chave(p);
+  if (Dados.ehFav(k)) Dados.d.favoritos = Dados.d.favoritos.filter(f => f.k !== k);
+  else Dados.d.favoritos.push({k, mercado: p.mercado, nome: p.nome, url: p.url, imagem: p.origem === "folheto" ? "" : p.imagem,
+    preco: p.preco, termo: termo || termoDe(p.nome), em: new Date().toISOString().slice(0, 10)});
+  Dados.salvar();
+}
+function adicionarNaLista(p, termo) {
+  const k = chave(p);
+  if (Dados.naLista(k)) return;
+  Dados.d.lista.push({id: Date.now() + Math.random(), texto: termo || termoDe(p.nome), qtd: 1, feito: false,
+    prod: {k, mercado: p.mercado, nome: p.nome}});
+  Dados.salvar();
+}
+// clique nas estrelas / carrinhos de qualquer lista de produtos
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-acao]"); if (!b) return;
+  const p = vistos.get(b.dataset.k); if (!p) return;
+  const termo = b.closest("#comparar") ? $("#q").value.trim() : "";
+  if (b.dataset.acao === "fav") { alternarFavorito(p, termo); b.classList.toggle("on", Dados.ehFav(b.dataset.k)); b.textContent = Dados.ehFav(b.dataset.k) ? "★" : "☆"; }
+  if (b.dataset.acao === "lista") { adicionarNaLista(p, termo); b.classList.add("ok"); b.textContent = "✓"; }
+  if (b.closest("#favoritos")) carregarFavoritos();
+});
 
 // abas
 document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
@@ -139,9 +278,19 @@ document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
   b.classList.add("ativo"); $("#" + b.dataset.aba).classList.add("ativo");
   if (b.dataset.aba === "ofertas") carregarOfertas();
   if (b.dataset.aba === "folhetos") carregarFolhetos();
+  if (b.dataset.aba === "favoritos") carregarFavoritos();
+  if (b.dataset.aba === "lista") desenharLista(), calcularLista();
 });
 
-function itemHTML(p, destaque) {
+function acoesHTML(p) {
+  const k = chave(p); vistos.set(k, p);
+  const fav = Dados.ehFav(k), lst = Dados.naLista(k);
+  return `<div class="acoes">
+    <button class="acao${fav ? " on" : ""}" data-acao="fav" data-k="${esc(k)}" title="Favoritar" type="button">${fav ? "★" : "☆"}</button>
+    <button class="acao${lst ? " ok" : ""}" data-acao="lista" data-k="${esc(k)}" title="Pôr na lista de compras" type="button">${lst ? "✓" : "🛒"}</button></div>`;
+}
+
+function itemHTML(p, destaque, extraHTML = "") {
   const cor = CORES[p.mercado] || "#555";
   const unid = p.preco_unidade ? `<small>${brl(p.preco_unidade)}/${p.unidade}</small>` : "";
   const de = p.preco_de ? `<s>${brl(p.preco_de)}</s>` : "";
@@ -155,8 +304,8 @@ function itemHTML(p, destaque) {
   const img = p.origem === "folheto" ? "" : esc(p.imagem);
   return `<div class="item${destaque ? " top" : ""}">
     ${img ? `<img loading="lazy" src="${img}" alt="">` : `<img alt="" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'/>">`}
-    <div><div class="nome"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.nome)}</a></div><div class="meta">${tags}</div></div>
-    <div class="preco">${de}<b>${brl(p.preco)}</b>${unid}</div></div>`;
+    <div><div class="nome"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.nome)}</a></div><div class="meta">${tags}</div>${extraHTML}</div>
+    <div class="preco">${de}<b>${brl(p.preco)}</b>${unid}</div>${acoesHTML(p)}</div>`;
 }
 
 function ordenar(lista, ordem) {
@@ -238,7 +387,9 @@ async function carregarFolhetos() {
 }
 $("#btnAtualFol").onclick = async () => {
   $("#btnAtualFol").disabled = true; $("#infoFol").textContent = "Buscando folhetos…";
-  const r = await fetch("/api/folhetos/atualizar", {method: "POST", body: JSON.stringify({loja_assai: $("#lojaAssai").value})}).then(r => r.json());
+  const sel = $("#lojaAssai").selectedOptions[0];
+  const r = await fetch("/api/folhetos/atualizar", {method: "POST", body: JSON.stringify(
+    {loja_assai_id: sel ? +sel.value : 0, loja_assai: sel ? sel.textContent.replace(/\s*\([\d.,]+ km\)$/, "") : ""})}).then(r => r.json());
   $("#btnAtualFol").disabled = false;
   const erros = Object.entries(r.erros || {});
   $("#progFol").innerHTML = erros.length ? `<div class="aviso">Falhou: ${erros.map(([m, e]) => esc(m + " (" + e + ")")).join(", ")}</div>` : "";
@@ -249,6 +400,158 @@ $("#btnLerFol").onclick = async () => {
   if (r.erro) { $("#avisoIA").innerHTML = `<div class="aviso">${esc(r.erro)}</div>`; return; }
   acompanhar();
 };
+
+// ---------- favoritos
+const custo = p => p.preco_unidade ?? p.preco;
+async function carregarFavoritos() {
+  const favs = Dados.d.favoritos;
+  if (!favs.length) {
+    $("#infoFav").textContent = "Nenhum favorito ainda. Toque na ☆ de qualquer produto (em Comparar ou Ofertas) para acompanhar o preço dele aqui.";
+    $("#listaFav").innerHTML = ""; return;
+  }
+  $("#infoFav").textContent = "Carregando preços…";
+  const r = await fetch("/api/favoritos/precos", {method: "POST", body: JSON.stringify({favoritos: favs})}).then(r => r.json());
+  let linhas = favs.map(f => ({f, ...(r[f.k] || {})}));
+  const ord = $("#ordemFav").value;
+  if (ord === "oferta") linhas.sort((a, b) => ((b.atual?.desconto || 0) - (a.atual?.desconto || 0)));
+  else if (ord === "mercado") linhas.sort((a, b) => a.f.mercado.localeCompare(b.f.mercado) || a.f.nome.localeCompare(b.f.nome));
+  else linhas.sort((a, b) => a.f.nome.localeCompare(b.f.nome));
+  const emOferta = linhas.filter(l => l.atual?.desconto > 0).length;
+  $("#infoFav").textContent = `${favs.length} favoritos${emOferta ? ` · ${emOferta} em oferta agora` : ""}. Os preços vêm da última busca; use “Atualizar preços” para buscar de novo.`;
+  $("#listaFav").innerHTML = linhas.map(({f, atual, alternativa}) => {
+    const p = atual || {mercado: f.mercado, nome: f.nome, url: f.url, imagem: f.imagem, preco: f.preco, origem: "site"};
+    let extra = "";
+    if (!atual) extra += `<div class="fav-alt pior">Sem preço recente nesta rede (pode ter saído do site). Mostrando o preço de quando você favoritou.</div>`;
+    else if (f.preco && Math.abs(atual.preco - f.preco) >= 0.01) {
+      const sobe = atual.preco > f.preco;
+      extra += `<div class="${sobe ? "var-up" : "var-down"}">${sobe ? "▲ subiu" : "▼ caiu"} ${brl(Math.abs(atual.preco - f.preco))} desde ${f.em.split("-").reverse().join("/")} (era ${brl(f.preco)})</div>`;
+    }
+    if (alternativa && (!atual || custo(alternativa) < custo(atual))) {
+      const u = alternativa.preco_unidade && atual?.preco_unidade ? `${brl(alternativa.preco_unidade)}/${alternativa.unidade}` : brl(alternativa.preco);
+      extra += `<div class="fav-alt">💡 Parecido mais barato: <b>${u}</b> no ${esc(alternativa.mercado)} — <a href="${esc(alternativa.url)}" target="_blank" rel="noopener">${esc(alternativa.nome)}</a></div>`;
+    }
+    return itemHTML(p, false, extra);
+  }).join("");
+}
+$("#ordemFav").onchange = carregarFavoritos;
+$("#btnAtualFav").onclick = async () => {
+  const termos = Dados.d.favoritos.map(f => f.termo);
+  if (!termos.length) return;
+  await fetch("/api/favoritos/atualizar", {method: "POST", body: JSON.stringify({termos})}); acompanhar();
+};
+
+// ---------- lista de compras
+let precosLista = {};   // id do item -> {melhor, por_mercado, fixo}
+function desenharLista() {
+  const itens = Dados.d.lista;
+  $("#infoLista").textContent = itens.length ? "" : "Lista vazia. Adicione itens acima ou toque no 🛒 de qualquer produto.";
+  $("#itensLista").innerHTML = itens.map(i => {
+    const pr = precosLista[i.id] || {};
+    const usado = pr.fixo || pr.melhor;
+    let onde = "<span class='sub'>buscando preço…</span>";
+    if (pr.calculado && !usado) onde = "Não encontrado nas lojas online. Tente um nome mais simples.";
+    else if (usado) {
+      onde = `${pr.fixo ? "Escolhido" : "Mais barato"}: <b>${esc(usado.mercado)}</b> — ${esc(usado.nome)} (${brl(usado.preco)}${usado.preco_unidade ? `, ${brl(usado.preco_unidade)}/${usado.unidade}` : ""})`;
+      if (pr.fixo && pr.melhor && custo(pr.melhor) < custo(pr.fixo) && chave(pr.melhor) !== chave(pr.fixo))
+        onde += `<br>💡 Mais barato: ${esc(pr.melhor.mercado)} — ${esc(pr.melhor.nome)} (${brl(pr.melhor.preco)})`;
+    } else if (i.prod) onde = `Escolhido: <b>${esc(i.prod.mercado)}</b> — ${esc(i.prod.nome)}`;
+    return `<div class="linha-lista${i.feito ? " feito" : ""}" data-id="${i.id}">
+      <input type="checkbox" data-c="feito"${i.feito ? " checked" : ""} title="Já peguei">
+      <input type="number" min="1" value="${i.qtd}" data-c="qtd" title="Quantidade">
+      <div><div class="txt">${esc(i.texto)}</div><div class="onde">${onde}</div></div>
+      <div class="preco valor"><b>${usado ? brl(usado.preco * i.qtd) : ""}</b></div>
+      <button class="acao" data-c="del" title="Remover" type="button">✕</button></div>`;
+  }).join("");
+  desenharTotais();
+}
+function desenharTotais() {
+  const itens = Dados.d.lista.filter(i => !i.feito && precosLista[i.id]?.calculado);
+  if (!itens.length) { $("#tituloTotais").hidden = true; $("#totais").innerHTML = ""; $("#infoTotais").textContent = ""; return; }
+  const mercados = {};
+  let melhorTotal = 0, achados = 0;
+  for (const i of itens) {
+    const pr = precosLista[i.id];
+    const usado = pr.fixo || pr.melhor;
+    if (usado) { melhorTotal += usado.preco * i.qtd; achados++; }
+    for (const [m, p] of Object.entries(pr.por_mercado || {})) {
+      mercados[m] ||= {total: 0, n: 0};
+      mercados[m].total += p.preco * i.qtd; mercados[m].n++;
+    }
+  }
+  const ranking = Object.entries(mercados).sort((a, b) => (b[1].n - a[1].n) || (a[1].total - b[1].total));
+  $("#tituloTotais").hidden = false;
+  $("#infoTotais").textContent = `Para ${itens.length} itens pendentes. Cada mercado entra com a opção mais barata (por kg/L) que ele tem de cada item.`;
+  $("#totais").innerHTML =
+    `<div class="total melhor"><span class="sub">Comprando o mais barato de cada item</span><b>${brl(melhorTotal)}</b><span class="sub">${achados} de ${itens.length} itens · vários mercados</span></div>` +
+    ranking.map(([m, t], idx) => `<div class="total"><span class="tag" style="background:${CORES[m] || "#555"}">${esc(m)}</span>
+      <b>${brl(t.total)}</b><span class="sub">${t.n} de ${itens.length} itens${t.n < itens.length ? " (faltam " + (itens.length - t.n) + ")" : ""}${idx === 0 && t.n === itens.length ? " · melhor num lugar só" : ""}</span></div>`).join("");
+}
+let calcId = 0;
+async function calcularLista() {
+  const itens = Dados.d.lista.filter(i => !precosLista[i.id]?.calculado || calcularLista.forcar);
+  calcularLista.forcar = false;
+  if (!itens.length) return desenharLista();
+  const meu = ++calcId;
+  $("#infoLista").textContent = `Buscando preços de ${itens.length} item(ns) em todas as redes…`;
+  const r = await fetch("/api/lista/precos", {method: "POST", body: JSON.stringify({itens: itens.map(i => ({texto: i.texto, prod: i.prod}))})}).then(r => r.json());
+  if (meu !== calcId) return;
+  (r.itens || []).forEach((res, n) => precosLista[itens[n].id] = {...res, calculado: true});
+  $("#infoLista").textContent = "";
+  desenharLista();
+}
+$("#formLista").onsubmit = e => {
+  e.preventDefault();
+  const texto = $("#novoItem").value.trim(); if (!texto) return;
+  Dados.d.lista.push({id: Date.now() + Math.random(), texto, qtd: Math.max(1, +$("#novaQtd").value || 1), feito: false});
+  Dados.salvar(); $("#novoItem").value = ""; $("#novaQtd").value = 1;
+  desenharLista(); calcularLista();
+};
+$("#itensLista").addEventListener("change", e => {
+  const linha = e.target.closest("[data-id]"); if (!linha) return;
+  const i = Dados.d.lista.find(x => String(x.id) === linha.dataset.id); if (!i) return;
+  if (e.target.dataset.c === "feito") i.feito = e.target.checked;
+  if (e.target.dataset.c === "qtd") i.qtd = Math.max(1, +e.target.value || 1);
+  Dados.salvar(); desenharLista();
+});
+$("#itensLista").addEventListener("click", e => {
+  if (e.target.dataset.c !== "del") return;
+  const id = e.target.closest("[data-id]").dataset.id;
+  Dados.d.lista = Dados.d.lista.filter(x => String(x.id) !== id); Dados.salvar(); desenharLista();
+});
+$("#btnCalcLista").onclick = () => { calcularLista.forcar = true; calcularLista(); };
+$("#btnLimparFeitos").onclick = () => { Dados.d.lista = Dados.d.lista.filter(i => !i.feito); Dados.salvar(); desenharLista(); };
+
+// ---------- CEP
+function mostrarCep(info) {
+  const e = info && info.endereco;
+  $("#btnCep").classList.toggle("vazio-cep", !e);
+  $("#btnCep").textContent = e ? `📍 ${e.cep.replace(/(\d{5})(\d{3})/, "$1-$2")} · ${e.bairro || e.cidade}` : "📍 Informe seu CEP";
+  if (!e) { $("#resumoCep").innerHTML = ""; return; }
+  const reg = Object.entries(info.redes_regionalizadas || {}).filter(([, v]) => v).map(([m]) => m);
+  const assai = (e.assai || [])[0];
+  $("#resumoCep").innerHTML = `Atual: ${esc([e.rua, e.bairro, e.cidade].filter(Boolean).join(", "))}<br>
+    Preços ajustados para sua região: ${esc(reg.join(", ") || "nenhuma")}${info.pao_de_acucar ? `, Pão de Açúcar (loja ${esc(info.pao_de_acucar)})` : "<br>Pão de Açúcar não entrega neste CEP; mostrando a loja padrão."}
+    ${assai ? `<br>Assaí mais perto: ${esc(assai.nome)} (${assai.km} km)` : ""}`;
+}
+$("#btnCep").onclick = () => { $("#erroCep").hidden = true; $("#dlgCep").showModal(); $("#inpCep").focus(); };
+$("#btnCepCancelar").onclick = () => $("#dlgCep").close();
+$("#inpCep").oninput = e => { const d = e.target.value.replace(/\D/g, "").slice(0, 8); e.target.value = d.length > 5 ? d.slice(0, 5) + "-" + d.slice(5) : d; };
+$("#formCep").onsubmit = async e => {
+  e.preventDefault();
+  $("#btnCepSalvar").disabled = true; $("#btnCepSalvar").textContent = "Localizando…"; $("#erroCep").hidden = true;
+  const r = await fetch("/api/local", {method: "POST", body: JSON.stringify({cep: $("#inpCep").value})}).then(r => r.json()).catch(() => ({erro: "sem conexão"}));
+  $("#btnCepSalvar").disabled = false; $("#btnCepSalvar").textContent = "Usar este CEP";
+  if (r.erro) { $("#erroCep").textContent = r.erro; $("#erroCep").hidden = false; return; }
+  mostrarCep(r); $("#dlgCep").close();
+  // preços antigos foram descartados: refaz o que está na tela
+  precosLista = {}; estado.produtos = []; $("#resultado").innerHTML = "";
+  if ($("#q").value.trim()) buscar();
+  const s = await status(); montarLojasAssai(s);
+  setTimeout(carregarFolhetos, 4000);
+};
+function montarLojasAssai(s) {
+  $("#lojaAssai").innerHTML = s.lojas_assai.map(l => `<option value="${l.id}"${l.id === s.loja_assai_id ? " selected" : ""}>${esc(l.nome)}</option>`).join("");
+}
 
 // ---------- status / progresso
 let timer = null;
@@ -267,14 +570,17 @@ async function status() {
     if (t.erros.length) $(alvo).innerHTML = `<div class="aviso">${t.erros.length} falha(s): ${esc(t.erros.slice(0, 5).join(" · "))}</div>`;
     else $(alvo).innerHTML = "";
     carregarOfertas(); carregarFolhetos();
+    if ($("#favoritos").classList.contains("ativo")) carregarFavoritos();
   }
   return s;
 }
 function acompanhar() { if (!timer) timer = setInterval(status, 1500); status(); }
 
 (async () => {
+  await Dados.carregar();
+  fetch("/api/local").then(r => r.json()).then(info => { mostrarCep(info); if (!info.endereco) $("#btnCep").click(); }).catch(() => {});
   const s = await status();
-  $("#lojaAssai").innerHTML = s.lojas_assai.map(l => `<option${l === s.loja_assai ? " selected" : ""}>${esc(l)}</option>`).join("");
+  montarLojasAssai(s);
   $("#mercadoOf").innerHTML += [...s.mercados_online, ...s.mercados_folheto].map(m => `<option>${esc(m)}</option>`).join("");
   if (s.trabalho.tarefa && !s.trabalho.fim) acompanhar();
 })();

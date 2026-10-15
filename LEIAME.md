@@ -28,6 +28,8 @@ O app fica visível só dentro da sua rede de casa, não na internet.
 |---|---|
 | **Comparar preços** | Busca um produto (ex.: "café 500g") em todas as redes ao mesmo tempo e ordena pelo menor preço por kg/L ou pelo menor preço. Clique numa rede para esconder ou mostrar. |
 | **Ofertas** | Junta tudo que está em promoção: preço "de/por", "leve 3 pague 2", preço de atacado e os itens lidos dos folhetos. "Atualizar ofertas" percorre uma cesta de ~40 itens básicos (leva de 1 a 3 min). |
+| **★ Favoritos** | Toque na ☆ de qualquer produto para acompanhá-lo. Mostra o preço atual, se subiu ou caiu desde que você favoritou e um produto parecido mais barato em outra rede. |
+| **🛒 Lista** | Monte sua lista com quantidades (digitando ou pelo 🛒 de um produto). O app mostra onde cada item sai mais barato e quanto a compra toda sai em cada mercado. |
 | **Folhetos** | Mostra os tabloides vigentes do Assaí (escolha sua loja) e do Roldão. Com a IA ligada, "Ler folhetos com IA" transforma cada página em lista de produtos e preços, que passam a aparecer nas outras abas. |
 
 ## Redes cobertas
@@ -40,7 +42,13 @@ O app fica visível só dentro da sua rede de casa, não na internet.
 - **Cercadão:** a página de jornal de ofertas está vazia no momento.
 - **Dia, St Marche, Nagumo e Hirota:** não encontrei uma fonte pública de preços.
 
-Atenção: alguns preços online (Atacadão, Pão de Açúcar) variam conforme a loja ou o CEP. O app usa o padrão de cada site, que costuma ser uma loja da capital.
+## CEP
+
+Clique em **📍** no topo e informe seu CEP. Com ele:
+- Pão de Açúcar, Atacadão, Sam's Club, Mambo, Oba, Coop, Savegnago, Zaffari e Swift mostram o preço e a disponibilidade da sua região. Produto que não é entregue no seu CEP some da lista.
+- O Assaí mais próximo é escolhido automaticamente para os folhetos.
+
+Ao trocar de CEP, os preços online salvos são apagados e buscados de novo.
 
 ## Ligar a leitura de folhetos com IA (opcional)
 
