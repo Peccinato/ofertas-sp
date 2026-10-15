@@ -120,9 +120,40 @@ def buscar_sonda(termo, n=24):
     return out
 
 
+_CARREFOUR_CARD = re.compile(r'<a [^>]*href="(/produto/[^"]+)"[^>]*data-testid="search-product-card"')
+_PRECO = re.compile(r"R\$\s*([\d.]+,\d{2})")
+
+
+def _reais(txt):
+    return float(txt.replace(".", "").replace(",", "."))
+
+
+def buscar_carrefour(termo, n=24):
+    # a API de busca do Carrefour bloqueia robôs, mas a página de busca já vem com os produtos no HTML
+    base = "https://mercado.carrefour.com.br"
+    h = http(f"{base}/s?q={quote(termo)}", timeout=30)
+    cards = list(_CARREFOUR_CARD.finditer(h))
+    out = []
+    for i, m in enumerate(cards[:n]):
+        trecho = h[m.end(): cards[i + 1].start() if i + 1 < len(cards) else m.end() + 6000]
+        nome = re.search(r"<h2[^>]*>(.*?)</h2>", trecho, re.S)
+        preco = re.search(r'text-price-default[^>]*>\s*' + _PRECO.pattern, trecho)
+        if not nome or not preco:
+            continue
+        de = re.search(r'line-through[^>]*>\s*' + _PRECO.pattern, trecho)
+        img = re.search(r'<img [^>]*src="([^"]+)"', trecho)
+        out.append(Produto(
+            mercado="Carrefour", nome=html.unescape(re.sub(r"<[^>]+>", "", nome.group(1))).strip(),
+            preco=_reais(preco.group(1)), preco_de=_reais(de.group(1)) if de else None,
+            imagem=html.unescape(img.group(1)) if img else "", url=base + m.group(1),
+        ).finalizar())
+    return out
+
+
 def fontes():
     """Lista de (nome do mercado, função de busca)."""
-    lista = [("Pão de Açúcar", buscar_pao_de_acucar), ("Tenda Atacado", buscar_tenda), ("Sonda", buscar_sonda)]
+    lista = [("Pão de Açúcar", buscar_pao_de_acucar), ("Tenda Atacado", buscar_tenda), ("Sonda", buscar_sonda),
+             ("Carrefour", buscar_carrefour)]
     for nome, host in VTEX.items():
         lista.append((nome, lambda termo, n=24, _m=nome, _h=host: buscar_vtex(_m, _h, termo, n)))
     return lista

@@ -273,7 +273,7 @@ class Handler(SimpleHTTPRequestHandler):
                     "trabalho": trabalho, "ia": ok, "ia_motivo": motivo, "contagens": db.contagens(),
                     "loja_assai_id": int(db.config("loja_assai_id") or ASSAI_LOJAS_SP.get(db.config("loja_assai", "Mooca"), 260)),
                     "lojas_assai": lojas_assai_menu(),
-                    "mercados_online": [n for n, _ in fontes()], "mercados_folheto": ["Assaí", "Roldão", "Akki", "Lopes", "Max Atacadista"],
+                    "mercados_online": [n for n, _ in fontes()], "mercados_folheto": ["Assaí", "Roldão", "Akki", "Lopes", "Max Atacadista", "Barbosa"],
                 })
         except Exception as e:
             return self._json({"erro": str(e)}, 500)

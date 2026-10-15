@@ -2,10 +2,12 @@
 import json
 import re
 import time
+import urllib.error
+import urllib.request
 from datetime import date, datetime
 from urllib.parse import urljoin, quote, unquote
 
-from .base import http, http_json
+from .base import UA, http, http_json
 
 # Lojas Assaí na cidade de São Paulo (nome -> loja_id usado no JSON de ofertas do site)
 ASSAI_LOJAS_SP = {
@@ -154,10 +156,63 @@ def folhetos_max(loja=120):
     return out
 
 
+_BARBOSA = "https://www.barbosasupermercados.com.br"
+_BARBOSA_API = "https://api-barbosa.applay.tech/api2/ecommerce/"
+
+
+def _token_barbosa():
+    """Token de acesso que o site do Barbosa (plataforma Applay) pede ao abrir, via "server action" do Next.js.
+    O identificador da action muda quando o site é atualizado, então é procurado nos scripts da página."""
+    h = http(_BARBOSA + "/tabloides")
+    ids = []
+    for c in sorted(set(re.findall(r'/_next/static/chunks/[^"\'\s\\]+\.js', h))):
+        js = http(_BARBOSA + c)
+        if "api2/ecommerce" in js or "handleUnauthorized" in js:
+            ids += re.findall(r'\)\("([0-9a-f]{40})"\)', js)
+    for action in dict.fromkeys(ids):
+        req = urllib.request.Request(_BARBOSA + "/tabloides", data=json.dumps(["https://api-barbosa.applay.tech/"]).encode(),
+                                     headers={"User-Agent": UA, "Accept": "text/x-component", "Next-Action": action,
+                                              "Content-Type": "text/plain;charset=UTF-8", "Origin": _BARBOSA})
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                for linha in r.read().decode("utf-8", "replace").splitlines():
+                    m = re.search(r'"token":"([^"]+)"', linha)
+                    if m:
+                        return m.group(1)
+        except urllib.error.HTTPError:
+            continue
+    raise RuntimeError("não achei o token de acesso do site do Barbosa")
+
+
+def folhetos_barbosa():
+    token = _token_barbosa()
+    api = lambda rota, corpo: http_json(_BARBOSA_API + rota, corpo, {"x-access-token": token, "Origin": _BARBOSA})
+    hoje = date.today()
+    out = []
+    for t in api("enav/listar_tabloides", {"session": {}}).get("data") or []:
+        fim = ""
+        m = re.match(r"(\d{1,2})/(\d{1,2})", t.get("dataFinal") or "")
+        if m:
+            try:
+                fim = date(hoje.year, int(m.group(2)), int(m.group(1))).isoformat()
+            except ValueError:
+                pass
+            if fim and fim < hoje.isoformat():
+                continue
+        arquivos = (api("enav/tabloide", {"tabloideId": t["_id"]}).get("data") or {}).get("files") or []
+        urls = [a["url"] for a in arquivos if a.get("url")] or ([t["url"]] if t.get("url") else [])
+        for i, u in enumerate(urls, 1):
+            out.append(_folheto("Barbosa", (t.get("nome") or "Tabloide").strip(), u, pagina=i,
+                                loja=f"{len(t.get('lojasId') or [])} lojas",
+                                validade=f"De {t.get('dataInicial', '')} a {t.get('dataFinal', '')}", fim=fim))
+    return out
+
+
 def todos_folhetos(loja_assai="Mooca", loja_assai_id=None):
     out, erros = [], {}
     for nome, f in (("Assaí", lambda: folhetos_assai(loja_assai, loja_assai_id)), ("Roldão", folhetos_roldao),
-                    ("Akki", folhetos_akki), ("Lopes", folhetos_lopes), ("Max Atacadista", folhetos_max)):
+                    ("Akki", folhetos_akki), ("Lopes", folhetos_lopes), ("Max Atacadista", folhetos_max),
+                    ("Barbosa", folhetos_barbosa)):
         try:
             out += f()
         except Exception as e:  # uma rede fora do ar não derruba as outras

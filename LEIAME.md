@@ -62,11 +62,12 @@ O app fica visível só dentro da sua rede de casa, não na internet.
 
 ## Redes cobertas
 
-- **Lojas online, com preço exato:** Pão de Açúcar, Sonda, Tenda Atacado, Atacadão, Sam's Club, Mambo, Oba Hortifruti, Coop, Savegnago, Zaffari e Swift.
-- **Folhetos, lidos com IA:** Assaí (35 lojas da capital), Roldão, Akki (PDF), Lopes e Max Atacadista (São Paulo).
+- **Lojas online, com preço exato:** Pão de Açúcar, Carrefour, Sonda, Tenda Atacado, Atacadão, Sam's Club, Mambo, Oba Hortifruti, Coop, Savegnago, Zaffari e Swift.
+- **Folhetos, lidos com IA:** Assaí (todas as lojas de SP), Roldão, Akki (PDF), Lopes, Max Atacadista e Barbosa.
 
 **Não entraram:**
-- **Carrefour e Barbosa:** os sites usam proteção antirrobô.
+- **Busca de produtos do Barbosa:** a API do site é criptografada de propósito contra robôs; o Barbosa entra pelos tabloides.
+- **Carrefour:** só a busca do site (15 produtos por busca, sem ajuste por CEP); a API deles bloqueia robôs.
 - **Cercadão:** a página de jornal de ofertas está vazia no momento.
 - **Dia, St Marche, Nagumo e Hirota:** não encontrei uma fonte pública de preços.
 

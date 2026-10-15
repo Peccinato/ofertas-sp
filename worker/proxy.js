@@ -7,10 +7,12 @@ const PERMITIDOS = [
   "api.vendas.gpa.digital",          // Pão de Açúcar
   "api.tendaatacado.com.br",         // Tenda
   "www.sondadelivery.com.br",        // Sonda
+  "mercado.carrefour.com.br",        // Carrefour (página de busca)
   "www.atacadao.com.br", "www.samsclub.com.br", "www.mambo.com.br", "www.obahortifruti.com.br",
   "www.coopsupermercado.com.br", "www.savegnago.com.br", "www.zaffari.com.br", "www.swift.com.br",
   "www.assai.com.br",                // lojas e tabloides do Assaí
   "d2q57q7k4hzryv.cloudfront.net",   // imagens dos tabloides do Assaí (bloqueiam servidores no exterior)
+  "files.applay.tech",               // imagens dos tabloides do Barbosa
 ];
 
 const CORS = {

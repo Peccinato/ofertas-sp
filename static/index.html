@@ -50,6 +50,14 @@
   .preco small { color: var(--sub); display: block; font-size: 12px; }
   .item.top { border-color: var(--acento); box-shadow: 0 0 0 1px var(--acento) inset; }
   .grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+  .grupo-fol { margin-bottom: 28px; }
+  .grupo-fol > header { position: static; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: none; border: 0;
+                        border-left: 5px solid var(--cor); padding: 4px 0 4px 10px; margin-bottom: 12px; }
+  .grupo-fol h3 { margin: 0; font-size: 17px; }
+  .grupo-fol .resumo-grupo { color: var(--sub); font-size: 13px; }
+  .grupo-fol .ver-produtos { margin-left: auto; font: inherit; font-size: 13px; padding: 6px 10px; border-radius: 8px;
+                             border: 1px solid var(--linha); background: var(--card); color: var(--acento); cursor: pointer; }
+  .chip.sel { border-color: var(--acento); color: var(--acento); font-weight: 600; }
   .folheto { background: var(--card); border: 1px solid var(--linha); border-radius: var(--raio); overflow: hidden; }
   .folheto img { width: 100%; aspect-ratio: 3/4; object-fit: cover; object-position: top; display: block; background: #fff; }
   .folheto > div { padding: 8px 10px; font-size: 13px; }
@@ -186,7 +194,8 @@
     <div id="avisoIA"></div>
     <div id="progFol"></div>
     <div class="info" id="infoFol"></div>
-    <div class="grade" id="gradeFol"></div>
+    <div class="chips" id="filtroFol"></div>
+    <div id="gradeFol"></div>
   </section>
 </main>
 
@@ -208,7 +217,7 @@
 const CORES = {"Pão de Açúcar":"#b5121b","Tenda Atacado":"#e85d04","Atacadão":"#d62828","Sam's Club":"#0067a0",
   "Mambo":"#2b9348","Oba Hortifruti":"#6a994e","Coop":"#1d4e89","Savegnago":"#c1121f","Zaffari":"#7b2cbf",
   "Assaí":"#f77f00","Roldão":"#003f88","Sonda":"#e30613","Swift":"#c8102e","Akki":"#f4a300",
-  "Lopes":"#00843d","Max Atacadista":"#e4002b"};
+  "Lopes":"#00843d","Max Atacadista":"#e4002b","Carrefour":"#1e5bc6","Barbosa":"#d71920"};
 const SUGESTOES = ["arroz 5kg","feijão carioca 1kg","café 500g","leite integral","óleo de soja","açúcar 5kg","ovos","cerveja lata","papel higiênico","sabão em pó"];
 const $ = s => document.querySelector(s);
 const brl = v => v == null ? "" : v.toLocaleString("pt-BR", {style:"currency", currency:"BRL"});
@@ -424,6 +433,7 @@ const AoVivo = {
     const k = semAcento(termo).trim(), salvo = this.cache.get(k);
     if (salvo && Date.now() - salvo.t < 30 * 60e3) return salvo.r;
     const fontes = {"Pão de Açúcar": () => this.gpa(termo, n), "Tenda Atacado": () => this.tenda(termo, n), "Sonda": () => this.sonda(termo, n),
+      "Carrefour": () => this.carrefour(termo, n),
       ...Object.fromEntries(Object.entries(VTEX_LOJAS).map(([m, h]) => [m, () => this.vtex(m, h, termo, n)]))};
     const produtos = [], erros = {};
     await Promise.all(Object.entries(fontes).map(async ([m, f]) => {
@@ -469,6 +479,23 @@ const AoVivo = {
       const at = (p.wholesalePrices || []).reduce((a, w) => !a || (w.price || 1e9) < a.price ? w : a, null);
       if (at?.price && at.minQuantity) extra = (extra ? extra + "; " : "") + `a partir de ${at.minQuantity} un: ${reais(at.price)}`;
       return {mercado: "Tenda Atacado", nome: p.name || "", preco: p.price, marca: p.brand || "", imagem: p.thumbnail || "", url: p.url || "", extra};
+    });
+  },
+  // a API do Carrefour bloqueia robôs; a página de busca já traz os produtos no HTML
+  async carrefour(termo, n) {
+    const base = "https://mercado.carrefour.com.br";
+    const h = await this.pedir(`${base}/s?q=${encodeURIComponent(termo)}`).then(r => r.text());
+    const cards = [...h.matchAll(/<a [^>]*href="(\/produto\/[^"]+)"[^>]*data-testid="search-product-card"/g)];
+    const real = t => +t.replace(/\./g, "").replace(",", ".");
+    const txt = document.createElement("textarea"), decodificar = s => (txt.innerHTML = s, txt.value);   // &amp; -> &
+    return cards.slice(0, n).flatMap((m, i) => {
+      const fim = i + 1 < cards.length ? cards[i + 1].index : m.index + m[0].length + 6000;
+      const t = h.slice(m.index + m[0].length, fim);
+      const nome = t.match(/<h2[^>]*>([\s\S]*?)<\/h2>/), preco = t.match(/text-price-default[^>]*>\s*R\$\s*([\d.]+,\d{2})/);
+      if (!nome || !preco) return [];
+      const de = t.match(/line-through[^>]*>\s*R\$\s*([\d.]+,\d{2})/), img = t.match(/<img [^>]*src="([^"]+)"/);
+      return [{mercado: "Carrefour", nome: decodificar(nome[1].replace(/<[^>]+>/g, "")).trim(), preco: real(preco[1]),
+               preco_de: de ? real(de[1]) : null, imagem: img ? decodificar(img[1]) : "", url: base + m[1]}];
     });
   },
   async sonda(termo, n) {
@@ -658,21 +685,48 @@ $("#ordemOf").onchange = desenharOfertas; $("#qOf").oninput = desenharOfertas;
 $("#btnAtualOf").onclick = async () => { await apiFetch("/api/ofertas/atualizar", {method: "POST"}); acompanhar(); };
 
 // ---------- folhetos
+let folhetosAtuais = [], filtroFol = "";
 async function carregarFolhetos() {
   const r = await apiFetch("/api/folhetos").then(r => r.json());
-  const fs = r.folhetos || [];
-  $("#infoFol").textContent = fs.length ? `${fs.length} páginas de folhetos vigentes. Clique numa página para abrir em tamanho real.` : "Nenhum folheto carregado. Clique em “Buscar folhetos novos”.";
-  $("#gradeFol").innerHTML = fs.map(f => {
-    const st = f.status === "lido" ? `<span class="tag fol">${f.n_itens} produtos lidos</span>`
-             : f.status === "erro" ? `<span class="tag desc" title="${esc(f.erro)}">erro na leitura</span>` : `<span class="meta">não lido</span>`;
-    const capa = /\.pdf$/i.test(f.imagem)
-      ? `<div class="pdf">PDF<small>${esc(f.titulo)}</small></div>`
-      : `<img loading="lazy" src="${esc(f.imagem)}" alt="">`;
-    return `<div class="folheto"><a href="${esc(f.imagem)}" target="_blank" rel="noopener">${capa}</a>
-      <div><span class="tag" style="background:${CORES[f.mercado]||"#555"}">${esc(f.mercado)}</span> ${esc(f.loja)} · pág. ${f.pagina}
-      <div class="meta">${esc(f.validade)}</div><div class="meta">${st}</div></div></div>`;
+  folhetosAtuais = r.folhetos || [];
+  desenharFolhetos();
+}
+function desenharFolhetos() {
+  const fs = folhetosAtuais;
+  // agrupa por mercado, em ordem alfabética
+  const grupos = {};
+  fs.forEach(f => (grupos[f.mercado] ||= []).push(f));
+  const mercados = Object.keys(grupos).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  if (filtroFol && !grupos[filtroFol]) filtroFol = "";
+  $("#infoFol").textContent = fs.length ? `${fs.length} páginas de folhetos vigentes em ${mercados.length} mercados. Toque numa página para abrir em tamanho real.`
+                                        : "Nenhum folheto carregado. Clique em “Buscar folhetos novos”.";
+  $("#filtroFol").innerHTML = fs.length ? [`<button class="chip${filtroFol ? "" : " sel"}" data-m="" type="button">Todos<span class="n">${fs.length}</span></button>`,
+    ...mercados.map(m => `<button class="chip${filtroFol === m ? " sel" : ""}" data-m="${esc(m)}" type="button"><span style="color:${CORES[m] || "inherit"}">●</span> ${esc(m)}<span class="n">${grupos[m].length}</span></button>`)].join("") : "";
+  $("#gradeFol").innerHTML = mercados.filter(m => !filtroFol || m === filtroFol).map(m => {
+    const lista = grupos[m], cor = CORES[m] || "#555";
+    const itens = lista.reduce((t, f) => t + (f.n_itens || 0), 0), lidas = lista.filter(f => f.status === "lido").length;
+    const cards = lista.map(f => {
+      const st = f.status === "lido" ? `<span class="tag fol">${f.n_itens} produtos lidos</span>`
+               : f.status === "erro" ? `<span class="tag desc" title="${esc(f.erro)}">erro na leitura</span>` : `<span class="meta">ainda não lido</span>`;
+      const capa = /\.pdf$/i.test(f.imagem) ? `<div class="pdf">PDF<small>${esc(f.titulo)}</small></div>` : `<img loading="lazy" src="${esc(f.imagem)}" alt="">`;
+      return `<div class="folheto"><a href="${esc(f.imagem)}" target="_blank" rel="noopener">${capa}</a>
+        <div><b>${esc(f.titulo)}</b>${f.pagina > 1 || lista.filter(x => x.titulo === f.titulo).length > 1 ? ` · pág. ${f.pagina}` : ""}
+        ${f.loja ? `<div class="meta">${esc(f.loja)}</div>` : ""}<div class="meta">${esc(f.validade)}</div><div class="meta">${st}</div></div></div>`;
+    }).join("");
+    return `<section class="grupo-fol" style="--cor:${cor}"><header>
+        <span class="tag" style="background:${cor}">${esc(m)}</span>
+        <span class="resumo-grupo">${lista.length} página${lista.length > 1 ? "s" : ""} · ${lidas === lista.length ? "todas lidas" : `${lidas} lida${lidas === 1 ? "" : "s"}`} · ${itens} produtos</span>
+        ${itens ? `<button class="ver-produtos" data-m="${esc(m)}" type="button">Ver produtos com preço →</button>` : ""}
+      </header><div class="grade">${cards}</div></section>`;
   }).join("");
 }
+$("#filtroFol").onclick = e => { const c = e.target.closest(".chip"); if (c) { filtroFol = c.dataset.m; desenharFolhetos(); } };
+// "Ver produtos": abre a aba Ofertas filtrada nesse mercado, só itens de folheto
+$("#gradeFol").addEventListener("click", e => {
+  const b = e.target.closest(".ver-produtos"); if (!b) return;
+  $("#mercadoOf").value = b.dataset.m; $("#origemOf").value = "folheto"; $("#qOf").value = "";
+  document.querySelector('nav [data-aba="ofertas"]').click();
+});
 $("#btnAtualFol").onclick = async () => {
   $("#btnAtualFol").disabled = true; $("#infoFol").textContent = "Buscando folhetos…";
   const sel = $("#lojaAssai").selectedOptions[0];

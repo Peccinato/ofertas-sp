@@ -135,7 +135,7 @@ def main():
     gravar("meta.json", {
         "gerado_em": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "local": app.info_local(),
         "mercados_online": [n for n, _ in app.fontes()],
-        "mercados_folheto": ["Assaí", "Roldão", "Akki", "Lopes", "Max Atacadista"],
+        "mercados_folheto": ["Assaí", "Roldão", "Akki", "Lopes", "Max Atacadista", "Barbosa"],
         "termos": len(termos), "falhas": {m: len(e) for m, e in falhas.items()},
         "proxy": os.environ.get("OFERTAS_PROXY", ""), "assai_lojas": assai_lojas,
     })
