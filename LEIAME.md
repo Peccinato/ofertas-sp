@@ -12,7 +12,18 @@ py app.py
 
 O navegador abre em http://localhost:8765. Não precisa instalar nada além do Python.
 
-## Usar no celular
+## Versão online (sem PC ligado)
+
+**https://peccinato.github.io/ofertas-sp/**
+
+- Atualiza sozinha todo dia às 6h (GitHub Actions, arquivo `.github/workflows/publicar.yml`). Para atualizar na hora, abra a aba **Actions** do repositório, clique em **Publicar site** e depois em **Run workflow**.
+- A busca procura nos cerca de 26 mil preços coletados naquele dia, de mais de 150 produtos.
+- Favoritos e lista ficam salvos no aparelho (no navegador do celular ou do PC).
+- **Trocar o CEP da coleta:** no repositório, vá em Settings > Secrets and variables > Actions > aba **Variables** e crie `OFERTAS_CEP` com o seu CEP (só números). O padrão é 01310-100 (Paulista).
+- **Ler folhetos com IA:** no mesmo lugar, aba **Secrets**, crie `ANTHROPIC_API_KEY` com a sua chave. Cada página de folheto é lida uma vez só.
+- O GitHub pausa tarefas agendadas de repositórios sem nenhuma atividade por 60 dias. Se o site parar de atualizar, é só rodar o workflow manualmente uma vez.
+
+## Usar no celular (pelo PC)
 
 1. No PC, dê dois cliques em **`Abrir no celular.bat`** e deixe a janela aberta.
 2. A janela mostra um endereço como `http://192.168.0.109:8765`. Abra esse endereço no navegador do celular, que precisa estar no mesmo Wi-Fi do PC.
