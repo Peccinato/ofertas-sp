@@ -3,7 +3,7 @@ import json
 import re
 import time
 from datetime import date, datetime
-from urllib.parse import quote, unquote
+from urllib.parse import urljoin, quote, unquote
 
 from .base import http, http_json
 
@@ -47,7 +47,7 @@ def folhetos_assai(loja="Mooca", loja_id=None):
         for i, img in enumerate(o.get("images", []), 1):
             out.append({
                 "mercado": "Assaí", "loja": loja, "titulo": o.get("title") or f"Tabloide {o.get('id_oferta')}",
-                "pagina": i, "imagem": img["url"], "validade": o.get("custom_text", ""),
+                "pagina": i, "imagem": urljoin("https://www.assai.com.br/", img["url"]), "validade": o.get("custom_text", ""),
                 "inicio": ini.isoformat() if ini else "", "fim": fim.isoformat() if fim else "",
             })
     return out

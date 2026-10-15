@@ -7,12 +7,14 @@ Usa, nesta ordem, o que estiver configurado:
 import base64
 import json
 import os
+import re
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 MODELO = os.environ.get("OFERTAS_MODELO", "claude-opus-5-5")
-GEMINI_MODELO = os.environ.get("GEMINI_MODELO", "gemini-2.5-flash")
+GEMINI_MODELO = os.environ.get("GEMINI_MODELO", "")   # vazio: escolhe sozinho o "flash" mais novo disponível
 
 ESQUEMA = {
     "type": "object",
@@ -77,10 +79,54 @@ _ESQUEMA_GEMINI = {
 _ultima_chamada = [0.0]
 
 
+_modelo = [GEMINI_MODELO]
+
+
+def _modelo_gemini():
+    """O Google aposenta modelos com frequência: pergunta à API quais existem e usa o 'flash' estável mais novo."""
+    if _modelo[0]:
+        return _modelo[0]
+    nomes, pagina = [], ""
+    while True:
+        url = "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200" + (f"&pageToken={pagina}" if pagina else "")
+        req = urllib.request.Request(url, headers={"x-goog-api-key": os.environ["GEMINI_API_KEY"]})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            d = json.loads(r.read().decode("utf-8"))
+        nomes += [m["name"].split("/", 1)[1] for m in d.get("models", [])
+                  if "generateContent" in m.get("supportedGenerationMethods", [])]
+        pagina = d.get("nextPageToken")
+        if not pagina:
+            break
+    def versao(n):
+        m = re.fullmatch(r"gemini-(\d+(?:\.\d+)?)-flash", n)   # só o "flash" estável (sem lite/preview/exp/image)
+        return float(m.group(1)) if m else None
+    candidatos = sorted((v, n) for n in nomes if (v := versao(n)) is not None)
+    if not candidatos:
+        raise RuntimeError(f"nenhum modelo Gemini flash disponível ({', '.join(nomes[:8])}...)")
+    _modelo[0] = candidatos[-1][1]
+    print("  Gemini: usando", _modelo[0])
+    return _modelo[0]
+
+
+def _baixar(url):
+    """Baixa a imagem; se o site bloquear (ex.: servidor no exterior), tenta pelo proxy do Cloudflare."""
+    tentativas = [url]
+    if os.environ.get("OFERTAS_PROXY"):
+        tentativas.append(os.environ["OFERTAS_PROXY"].rstrip("/") + "/?url=" + urllib.parse.quote(url, safe=""))
+    for i, u in enumerate(tentativas):
+        try:
+            req = urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/128 Safari/537.36"})
+            with urllib.request.urlopen(req, timeout=60) as r:
+                return r.read(), (r.headers.get_content_type() or "image/jpeg")
+        except urllib.error.HTTPError:
+            if i == len(tentativas) - 1:
+                raise
+
+
 def _extrair_gemini(url):
-    req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (ofertas-sp)"})
-    with urllib.request.urlopen(req, timeout=60) as r:
-        dados, tipo = r.read(), (r.headers.get_content_type() or "image/jpeg")
+    dados, tipo = _baixar(url)
+    if tipo in ("application/octet-stream", "text/plain"):
+        tipo = "image/jpeg"
     if url.lower().endswith(".pdf"):
         tipo = "application/pdf"
     corpo = json.dumps({
@@ -88,7 +134,7 @@ def _extrair_gemini(url):
                                 {"text": PROMPT}]}],
         "generationConfig": {"responseMimeType": "application/json", "responseSchema": _ESQUEMA_GEMINI, "temperature": 0},
     }).encode()
-    api = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODELO}:generateContent"
+    api = f"https://generativelanguage.googleapis.com/v1beta/models/{_modelo_gemini()}:generateContent"
     for tentativa in range(4):
         # o plano grátis limita as chamadas por minuto: espaça e, se estourar, espera e tenta de novo
         espera = 7 - (time.time() - _ultima_chamada[0])

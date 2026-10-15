@@ -18,6 +18,7 @@ import sys
 import tempfile
 import time
 import urllib.request
+from urllib.parse import urljoin
 
 PASTA = os.path.dirname(os.path.abspath(__file__))
 SAIDA = os.environ.get("OFERTAS_SAIDA") or os.path.join(PASTA, "site")
@@ -150,8 +151,8 @@ def tabloides_assai(lojas_ids):
         if not ids:
             continue
         for i, img in enumerate(o.get("images", []), 1):
-            f = out.setdefault(img["url"], {"mercado": "Assaí", "titulo": o.get("title") or f"Tabloide {o.get('id_oferta')}",
-                                            "pagina": i, "imagem": img["url"], "validade": o.get("custom_text", ""),
+            f = out.setdefault(urljoin("https://www.assai.com.br/", img["url"]), {"mercado": "Assaí", "titulo": o.get("title") or f"Tabloide {o.get('id_oferta')}",
+                                            "pagina": i, "imagem": urljoin("https://www.assai.com.br/", img["url"]), "validade": o.get("custom_text", ""),
                                             "fim": fim.isoformat() if fim else "", "lojas": []})
             f["lojas"] = sorted(set(f["lojas"]) | set(ids))
     return list(out.values())

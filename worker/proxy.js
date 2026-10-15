@@ -10,6 +10,7 @@ const PERMITIDOS = [
   "www.atacadao.com.br", "www.samsclub.com.br", "www.mambo.com.br", "www.obahortifruti.com.br",
   "www.coopsupermercado.com.br", "www.savegnago.com.br", "www.zaffari.com.br", "www.swift.com.br",
   "www.assai.com.br",                // lojas e tabloides do Assaí
+  "d2q57q7k4hzryv.cloudfront.net",   // imagens dos tabloides do Assaí (bloqueiam servidores no exterior)
 ];
 
 const CORS = {
