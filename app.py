@@ -145,8 +145,9 @@ def info_local():
     vtex = reg.get("vtex") or {}
     redes = {nome: bool(vtex.get(host)) for nome, host in VTEX.items()}
     gpa = reg.get("gpa")
+    extra = reg.get("extra")
     return {"endereco": end, "redes_regionalizadas": redes,
-            "pao_de_acucar": gpa["nome"] if gpa else None}
+            "pao_de_acucar": gpa["nome"] if gpa else None, "extra": extra["nome"] if extra else None}
 
 
 def lojas_assai_menu():

@@ -62,7 +62,7 @@ O app fica visível só dentro da sua rede de casa, não na internet.
 
 ## Redes cobertas
 
-- **Lojas online, com preço exato:** Pão de Açúcar, Carrefour, Sonda, Tenda Atacado, Atacadão, Sam's Club, Mambo, Oba Hortifruti, Coop, Savegnago, Zaffari e Swift.
+- **Lojas online, com preço exato:** Pão de Açúcar, Extra, Carrefour, Sonda, Tenda Atacado, Atacadão, Sam's Club, Mambo, Oba Hortifruti, Coop, Savegnago, Zaffari e Swift.
 - **Folhetos, lidos com IA:** Assaí (todas as lojas de SP), Roldão, Akki (PDF), Lopes, Max Atacadista e Barbosa.
 
 **Não entraram:**
@@ -74,7 +74,7 @@ O app fica visível só dentro da sua rede de casa, não na internet.
 ## CEP
 
 Clique em **📍** no topo e informe seu CEP. Com ele:
-- Pão de Açúcar, Atacadão, Sam's Club, Mambo, Oba, Coop, Savegnago, Zaffari e Swift mostram o preço e a disponibilidade da sua região. Produto que não é entregue no seu CEP some da lista.
+- Pão de Açúcar, Extra, Atacadão, Sam's Club, Mambo, Oba, Coop, Savegnago, Zaffari e Swift mostram o preço e a disponibilidade da sua região. Produto que não é entregue no seu CEP some da lista.
 - O Assaí mais próximo é escolhido automaticamente para os folhetos.
 
 Ao trocar de CEP, os preços online salvos são apagados e buscados de novo.

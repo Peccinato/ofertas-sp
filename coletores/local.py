@@ -60,9 +60,9 @@ def _regiao_vtex(host, cep):
         return host, ""
 
 
-def _loja_gpa(cep):
+def _loja_gpa(cep, rede="pa"):
     try:
-        d = http_json(f"https://api.vendas.gpa.digital/pa/delivery/options?zipCode={cep}")
+        d = http_json(f"https://api.vendas.gpa.digital/{rede}/delivery/options?zipCode={cep}")
         tipos = (d.get("content") or {}).get("deliveryTypes") or []
         if tipos:
             return {"id": tipos[0]["storeid"], "nome": tipos[0].get("storeName", "")}
@@ -75,8 +75,8 @@ def regioes(cep):
     """Descobre a região/loja que atende o CEP em cada rede online."""
     with ThreadPoolExecutor(max_workers=10) as ex:
         vtex = dict(ex.map(lambda h: _regiao_vtex(h, cep), VTEX.values()))
-        gpa = _loja_gpa(cep)
-    return {"vtex": vtex, "gpa": gpa}
+        gpa, extra = ex.map(lambda r: _loja_gpa(cep, r), ("pa", "ex"))
+    return {"vtex": vtex, "gpa": gpa, "extra": extra}
 
 
 def aplicar(reg):
@@ -84,6 +84,8 @@ def aplicar(reg):
     REGIAO["vtex"] = dict((reg or {}).get("vtex") or {})
     gpa = (reg or {}).get("gpa")
     REGIAO["gpa_loja"] = gpa["id"] if gpa else None
+    extra = (reg or {}).get("extra")
+    REGIAO["extra_loja"] = extra["id"] if extra else None
 
 
 def lojas_assai():

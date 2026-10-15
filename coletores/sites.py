@@ -19,7 +19,10 @@ VTEX = {
 
 
 # Região do usuário (definida pelo CEP em coletores/local.py): host VTEX -> regionId, loja do Pão de Açúcar
-REGIAO = {"vtex": {}, "gpa_loja": None}
+REGIAO = {"vtex": {}, "gpa_loja": None, "extra_loja": None}
+
+# Redes do grupo GPA (mesma API): código da rede, loja padrão quando o CEP não é atendido
+GPA = {"Pão de Açúcar": ("pa", 461, "gpa_loja"), "Extra": ("ex", 570, "extra_loja")}
 
 
 def buscar_vtex(mercado, host, termo, n=24):
@@ -46,10 +49,11 @@ def buscar_vtex(mercado, host, termo, n=24):
     return out
 
 
-def buscar_pao_de_acucar(termo, n=24):
+def buscar_gpa(mercado, termo, n=24):
+    rede, loja_padrao, chave_regiao = GPA[mercado]
     body = {"terms": termo, "page": 1, "sortBy": "relevance", "resultsPerPage": n, "allowRedirect": False,
-            "storeId": REGIAO["gpa_loja"] or 461, "department": "ecom", "customerPlus": True, "partner": "linx"}
-    d = http_json("https://api.vendas.gpa.digital/pa/search/search", body)
+            "storeId": REGIAO[chave_regiao] or loja_padrao, "department": "ecom", "customerPlus": True, "partner": "linx"}
+    d = http_json(f"https://api.vendas.gpa.digital/{rede}/search/search", body)
     out = []
     for p in d.get("products", []):
         if not p.get("stock") or not p.get("price"):
@@ -60,9 +64,9 @@ def buscar_pao_de_acucar(termo, n=24):
             extra = f"leve {promo['promotionQuantityBuy']} pague {promo['promotionQuantityPayFor']}"
         img = (p.get("productImages") or [""])[0]
         if img.startswith("/"):
-            img = "https://static.paodeacucar.com" + img
+            img = "https://static.paodeacucar.com" + img   # catálogo de imagens comum às redes do GPA
         out.append(Produto(
-            mercado="Pão de Açúcar", nome=p.get("name", ""), preco=p["price"], preco_de=p.get("priceFrom"),
+            mercado=mercado, nome=p.get("name", ""), preco=p["price"], preco_de=p.get("priceFrom"),
             marca=p.get("brand", ""), imagem=img, url=p.get("urlDetails", ""), extra=extra,
             validade=(promo.get("endDate") or "")[:10],
         ).finalizar())
@@ -152,7 +156,8 @@ def buscar_carrefour(termo, n=24):
 
 def fontes():
     """Lista de (nome do mercado, função de busca)."""
-    lista = [("Pão de Açúcar", buscar_pao_de_acucar), ("Tenda Atacado", buscar_tenda), ("Sonda", buscar_sonda),
+    lista = [(m, lambda termo, n=24, _m=m: buscar_gpa(_m, termo, n)) for m in GPA]
+    lista += [("Tenda Atacado", buscar_tenda), ("Sonda", buscar_sonda),
              ("Carrefour", buscar_carrefour)]
     for nome, host in VTEX.items():
         lista.append((nome, lambda termo, n=24, _m=nome, _h=host: buscar_vtex(_m, _h, termo, n)))

@@ -217,7 +217,7 @@
 const CORES = {"Pão de Açúcar":"#b5121b","Tenda Atacado":"#e85d04","Atacadão":"#d62828","Sam's Club":"#0067a0",
   "Mambo":"#2b9348","Oba Hortifruti":"#6a994e","Coop":"#1d4e89","Savegnago":"#c1121f","Zaffari":"#7b2cbf",
   "Assaí":"#f77f00","Roldão":"#003f88","Sonda":"#e30613","Swift":"#c8102e","Akki":"#f4a300",
-  "Lopes":"#00843d","Max Atacadista":"#e4002b","Carrefour":"#1e5bc6","Barbosa":"#d71920"};
+  "Lopes":"#00843d","Max Atacadista":"#e4002b","Carrefour":"#1e5bc6","Barbosa":"#d71920","Extra":"#e2001a"};
 const SUGESTOES = ["arroz 5kg","feijão carioca 1kg","café 500g","leite integral","óleo de soja","açúcar 5kg","ovos","cerveja lata","papel higiênico","sabão em pó"];
 const $ = s => document.querySelector(s);
 const brl = v => v == null ? "" : v.toLocaleString("pt-BR", {style:"currency", currency:"BRL"});
@@ -382,7 +382,7 @@ const AoVivo = {
   info() {
     const e = this.local?.endereco, reg = this.local?.regiao || {};
     return {endereco: e, redes_regionalizadas: Object.fromEntries(Object.entries(VTEX_LOJAS).map(([n, h]) => [n, !!reg.vtex?.[h]])),
-            pao_de_acucar: reg.gpa?.nome || null};
+            pao_de_acucar: reg.gpa?.nome || null, extra: reg.extra?.nome || null};
   },
   async definirCep(cepTxt) {
     const cep = (cepTxt || "").replace(/\D/g, "");
@@ -410,13 +410,13 @@ const AoVivo = {
       }
     }
     // região de entrega de cada rede
-    const regiao = {vtex: {}, gpa: null};
+    const regiao = {vtex: {}, gpa: null, extra: null};
     await Promise.all([
       ...Object.values(VTEX_LOJAS).map(h => this.json(`https://${h}/api/checkout/pub/regions?country=BRA&postalCode=${cep}`)
         .then(r => { regiao.vtex[h] = r[0]?.id || ""; }).catch(() => {})),
-      this.json(`https://api.vendas.gpa.digital/pa/delivery/options?zipCode=${cep}`).then(d => {
-        const t = d.content?.deliveryTypes?.[0]; if (t) regiao.gpa = {id: t.storeid, nome: t.storeName || ""};
-      }).catch(() => {}),
+      ...[["pa", "gpa"], ["ex", "extra"]].map(([rede, k]) => this.json(`https://api.vendas.gpa.digital/${rede}/delivery/options?zipCode=${cep}`).then(d => {
+        const t = d.content?.deliveryTypes?.[0]; if (t) regiao[k] = {id: t.storeid, nome: t.storeName || ""};
+      }).catch(() => {})),
     ]);
     // Assaí mais próximo
     if (e.lat != null) {
@@ -432,7 +432,7 @@ const AoVivo = {
   async buscar(termo, n = 24) {
     const k = semAcento(termo).trim(), salvo = this.cache.get(k);
     if (salvo && Date.now() - salvo.t < 30 * 60e3) return salvo.r;
-    const fontes = {"Pão de Açúcar": () => this.gpa(termo, n), "Tenda Atacado": () => this.tenda(termo, n), "Sonda": () => this.sonda(termo, n),
+    const fontes = {"Pão de Açúcar": () => this.gpa("Pão de Açúcar", termo, n), "Extra": () => this.gpa("Extra", termo, n), "Tenda Atacado": () => this.tenda(termo, n), "Sonda": () => this.sonda(termo, n),
       "Carrefour": () => this.carrefour(termo, n),
       ...Object.fromEntries(Object.entries(VTEX_LOJAS).map(([m, h]) => [m, () => this.vtex(m, h, termo, n)]))};
     const produtos = [], erros = {};
@@ -456,14 +456,16 @@ const AoVivo = {
                imagem: item.images?.[0]?.imageUrl || "", url: `https://${host}/${p.linkText || ""}/p`}];
     });
   },
-  async gpa(termo, n) {
-    const d = await this.json("https://api.vendas.gpa.digital/pa/search/search", {terms: termo, page: 1, sortBy: "relevance",
-      resultsPerPage: n, allowRedirect: false, storeId: this.local?.regiao?.gpa?.id || 461, department: "ecom", customerPlus: true, partner: "linx"});
+  // Pão de Açúcar e Extra usam a mesma API do grupo GPA: muda o código da rede e a loja que atende o CEP
+  async gpa(mercado, termo, n) {
+    const [rede, chaveRegiao, lojaPadrao] = mercado === "Extra" ? ["ex", "extra", 570] : ["pa", "gpa", 461];
+    const d = await this.json(`https://api.vendas.gpa.digital/${rede}/search/search`, {terms: termo, page: 1, sortBy: "relevance",
+      resultsPerPage: n, allowRedirect: false, storeId: this.local?.regiao?.[chaveRegiao]?.id || lojaPadrao, department: "ecom", customerPlus: true, partner: "linx"});
     return (d.products || []).filter(p => p.stock && p.price).map(p => {
       const promo = p.productPromotion || {};
       let img = (p.productImages || [""])[0];
       if (img.startsWith("/")) img = "https://static.paodeacucar.com" + img;
-      return {mercado: "Pão de Açúcar", nome: p.name || "", preco: p.price, preco_de: p.priceFrom, marca: p.brand || "", imagem: img,
+      return {mercado, nome: p.name || "", preco: p.price, preco_de: p.priceFrom, marca: p.brand || "", imagem: img,
         url: p.urlDetails || "", validade: (promo.endDate || "").slice(0, 10),
         extra: promo.promotionQuantityBuy && promo.promotionQuantityPayFor ? `leve ${promo.promotionQuantityBuy} pague ${promo.promotionQuantityPayFor}` : ""};
     });
@@ -876,7 +878,7 @@ function mostrarCep(info) {
   const assai = (e.assai || [])[0];
   $("#resumoCep").innerHTML = (Estatico.ativo && !AoVivo.ativo ? "<b>Na versão online o CEP é fixo</b>: os preços são coletados uma vez por dia para a região abaixo. Para usar outro CEP, abra o app no PC.<br><br>" : "") +
     `Atual: ${esc([e.rua, e.bairro, e.cidade].filter(Boolean).join(", "))}<br>
-    Preços ajustados para sua região: ${esc(reg.join(", ") || "nenhuma")}${info.pao_de_acucar ? `, Pão de Açúcar (loja ${esc(info.pao_de_acucar)})` : "<br>Pão de Açúcar não entrega neste CEP; mostrando a loja padrão."}
+    Preços ajustados para sua região: ${esc(reg.join(", ") || "nenhuma")}${[["Pão de Açúcar", info.pao_de_acucar], ["Extra", info.extra]].map(([m, loja]) => loja ? `<br>${m}: loja ${esc(loja)}` : `<br>${m} não entrega neste CEP; mostrando a loja padrão.`).join("")}
     ${assai ? `<br>Assaí mais perto: ${esc(assai.nome)} (${assai.km} km)` : ""}`;
 }
 $("#btnCep").onclick = () => { $("#erroCep").hidden = true; $("#dlgCep").showModal(); $("#inpCep").focus(); };
