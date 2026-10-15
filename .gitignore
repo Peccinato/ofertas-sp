@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 .claude/
 site/
+worker/.wrangler/
+node_modules/

@@ -8,8 +8,12 @@ from urllib.parse import urlencode
 from .base import http, http_json
 from .sites import REGIAO, VTEX
 
-# coordenada genérica que a BrasilAPI devolve quando não sabe a exata (centro de SP)
-_CENTRO_GENERICO = ("-23.5475", "-46.6361")
+# coordenada genérica que a BrasilAPI devolve quando não sabe a exata (marco zero de SP)
+_CENTRO_GENERICO = (-23.5475, -46.6361)
+
+
+def _generica(lat, lon):
+    return abs(lat - _CENTRO_GENERICO[0]) < 0.002 and abs(lon - _CENTRO_GENERICO[1]) < 0.002
 
 
 def limpar_cep(cep):
@@ -27,7 +31,7 @@ def resolver_cep(cep):
         d = http_json(f"https://brasilapi.com.br/api/cep/v2/{cep}")
         end.update(rua=d.get("street") or "", bairro=d.get("neighborhood") or "", cidade=d.get("city") or "", uf=d.get("state") or "")
         c = (d.get("location") or {}).get("coordinates") or {}
-        if c.get("latitude") and (c.get("latitude"), c.get("longitude")) != _CENTRO_GENERICO:
+        if c.get("latitude") and c.get("longitude") and not _generica(float(c["latitude"]), float(c["longitude"])):
             end.update(lat=float(c["latitude"]), lon=float(c["longitude"]))
     except Exception:
         d = http_json(f"https://viacep.com.br/ws/{cep}/json/")
@@ -35,11 +39,11 @@ def resolver_cep(cep):
             raise ValueError("CEP não encontrado")
         end.update(rua=d.get("logradouro", ""), bairro=d.get("bairro", ""), cidade=d.get("localidade", ""), uf=d.get("uf", ""))
     if end["lat"] is None and end["cidade"]:
-        # coordenada pelo OpenStreetMap (rua + cidade, ou só bairro + cidade)
-        for q in ({"street": end["rua"], "city": end["cidade"], "state": end["uf"]},
-                  {"q": f"{end['bairro']}, {end['cidade']}, {end['uf']}"}):
+        # coordenada pelo OpenStreetMap: rua + bairro (o bairro evita ruas homônimas), senão só o bairro
+        for q in (", ".join(x for x in (end["rua"], end["bairro"], end["cidade"], end["uf"]) if x),
+                  ", ".join(x for x in (end["bairro"], end["cidade"], end["uf"]) if x)):
             try:
-                r = http_json("https://nominatim.openstreetmap.org/search?" + urlencode({**q, "country": "Brasil", "format": "json", "limit": 1}))
+                r = http_json("https://nominatim.openstreetmap.org/search?" + urlencode({"q": q, "countrycodes": "br", "format": "json", "limit": 1}))
                 if r:
                     end.update(lat=float(r[0]["lat"]), lon=float(r[0]["lon"]))
                     break

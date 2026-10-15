@@ -93,7 +93,7 @@
   h2 { font-size: 15px; margin: 18px 0 8px; }
   /* versão online: sem coleta pelo navegador */
   .estatico #btnAtualOf, .estatico #btnAtualFol, .estatico #btnLerFol, .estatico #btnAtualFav, .estatico #lojaAssai,
-  .estatico #lblAssai, .estatico #avisoIA, .estatico #refazer, .estatico #btnCepSalvar, .estatico #inpCep { display: none !important; }
+  .estatico #lblAssai, .estatico #avisoIA, .estatico #refazer, .sem-proxy #btnCepSalvar, .sem-proxy #inpCep { display: none !important; }
   @media (max-width: 560px) {
     .item { grid-template-columns: 44px 1fr auto; } .item img { width: 44px; height: 44px; }
     .preco { grid-column: 2; text-align: left; } .acoes { grid-row: 1 / span 2; grid-column: 3; }
@@ -220,7 +220,7 @@ const vistos = new Map();   // chave -> produto exibido (para os botões de favo
 // ---------- modo online (GitHub Pages): sem servidor, responde as rotas /api com os dados coletados no dia
 const semAcento = s => (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 const Estatico = {
-  ativo: false, produtos: [], folhetos: [], meta: {},
+  ativo: false, produtos: [], folhetos: [], assai: [], lidos: {}, meta: {},
   async iniciar() {
     try {
       const r = await fetch("dados/meta.json", {cache: "no-cache"});
@@ -228,69 +228,277 @@ const Estatico = {
       this.meta = await r.json();
     } catch { return; }
     this.ativo = true;
-    const [prods, fols] = await Promise.all([
-      fetch("dados/produtos.json", {cache: "no-cache"}).then(r => r.json()),
-      fetch("dados/folhetos.json", {cache: "no-cache"}).then(r => r.json()).catch(() => []),
+    const json = (n, padrao) => fetch("dados/" + n, {cache: "no-cache"}).then(r => r.json()).catch(() => padrao);
+    const [prods, fols, assai, lidos] = await Promise.all([
+      json("produtos.json", {colunas: [], linhas: []}), json("folhetos.json", []), json("assai.json", []), json("folhetos-lidos.json", {}),
     ]);
     const cols = prods.colunas;
-    this.produtos = prods.linhas.map(l => {
-      const p = Object.fromEntries(cols.map((c, i) => [c, l[i]]));
-      p.nome_busca = semAcento(p.nome + " " + (p.marca || ""));
-      return p;
-    });
-    this.folhetos = fols;
+    this.produtos = prods.linhas.map(l => preparar(Object.fromEntries(cols.map((c, i) => [c, l[i]]))))
+      .filter(p => p.origem !== "folheto");   // itens de folheto vêm de `lidos`, conforme a região do usuário
+    this.folhetos = fols.filter(f => f.mercado !== "Assaí");
+    this.assai = assai; this.lidos = lidos;
+    AoVivo.iniciar(this.meta.proxy);
     document.body.classList.add("estatico");
+    if (!AoVivo.ativo) document.body.classList.add("sem-proxy");
   },
-  consultar(q = "", {mercado = "", origem = "", soOfertas = false, limite = 600} = {}) {
-    const raizes = semAcento(q).split(/\s+/).filter(w => w.length >= 2).map(w => {
-      let r = w.length > 4 && w.endsWith("s") ? w.slice(0, -1) : w;
-      return r.length > 4 && "aeo".includes(r.at(-1)) ? r.slice(0, -1) : r;
+  // folhetos da região: Assaí da loja mais próxima do CEP do usuário + as demais redes
+  folhetosDaRegiao() {
+    const loja = AoVivo.lojaAssai();
+    const assai = loja ? this.assai.filter(f => f.lojas.includes(loja.id)).map(f => ({...f, loja: loja.nome})) : [];
+    return [...assai, ...this.folhetos].map(f => {
+      const itens = this.lidos[f.imagem];
+      return {...f, status: itens ? "lido" : "pendente", n_itens: itens ? itens.length : 0};
     });
-    return this.produtos.filter(p => raizes.every(r => p.nome_busca.includes(r))
+  },
+  produtosDeFolheto() {
+    if (this._fol && this._folLoja === AoVivo.lojaAssai()?.id) return this._fol;
+    this._folLoja = AoVivo.lojaAssai()?.id;
+    this._fol = this.folhetosDaRegiao().flatMap(f => (this.lidos[f.imagem] || []).filter(i => i.nome && i.preco).map(i => preparar(finalizar({
+      mercado: f.mercado, nome: i.nome, preco: +i.preco, preco_de: i.preco_de, marca: "", imagem: f.imagem, url: f.imagem,
+      origem: "folheto", validade: f.validade || "", extra: i.condicao || "",
+    }))));
+    return this._fol;
+  },
+  todos() { return [...this.produtos, ...this.produtosDeFolheto()]; },
+  consultar(q = "", {mercado = "", origem = "", soOfertas = false, limite = 600, lista = null} = {}) {
+    const raizes = raizesBusca(q);
+    return (lista || this.todos()).filter(p => raizes.every(r => p.nome_busca.includes(r))
         && (!mercado || p.mercado === mercado) && (!origem || p.origem === origem)
         && (!soOfertas || p.desconto > 0 || p.origem === "folheto" || p.extra))
       .sort((a, b) => (a.preco_unidade ?? a.preco) - (b.preco_unidade ?? b.preco)).slice(0, limite);
   },
-  porChave(k) { return this.produtos.find(p => chave(p) === k) || null; },
-  responder(caminho, corpo) {
+  porChave(k) { return this.todos().find(p => chave(p) === k) || null; },
+  // produtos para um termo: ao vivo (com o CEP do usuário) quando há proxy, senão os coletados no dia
+  async produtosPara(termo) {
+    if (!AoVivo.ativo) return {produtos: this.consultar(termo), erros: {}};
+    const r = await AoVivo.buscar(termo);
+    return {produtos: this.consultar(termo, {lista: [...r.produtos, ...this.produtosDeFolheto()]}), erros: r.erros};
+  },
+  async responder(caminho, corpo) {
     const u = new URL(caminho, location.href), q = Object.fromEntries(u.searchParams);
     const custoP = p => p.preco_unidade || p.preco;
     switch (u.pathname.replace(/^.*\/api\//, "")) {
       case "status": return {estatico: true, trabalho: {tarefa: "", feito: 0, total: 0, erros: [], fim: 1}, ia: true, ia_motivo: "",
         contagens: [{n: this.produtos.length}], lojas_assai: [], loja_assai_id: 0,
         mercados_online: this.meta.mercados_online || [], mercados_folheto: this.meta.mercados_folheto || []};
-      case "buscar": return {produtos: q.q ? this.consultar(q.q) : [], erros: {}};
+      case "buscar": return q.q ? this.produtosPara(q.q) : {produtos: [], erros: {}};
       case "ofertas": return {produtos: this.consultar(q.q || "", {mercado: q.mercado, origem: q.origem, soOfertas: true, limite: 2000})};
-      case "folhetos": return {folhetos: this.folhetos};
-      case "local": return corpo ? {erro: "Na versão online o CEP é fixo (definido na coleta diária). Para usar o seu CEP, abra o app no PC."} : (this.meta.local || {endereco: null});
+      case "folhetos": return {folhetos: this.folhetosDaRegiao()};
+      case "local":
+        if (corpo) {
+          if (!AoVivo.ativo) return {erro: "Na versão online o CEP é fixo (definido na coleta diária). Para usar o seu CEP, abra o app no PC."};
+          try { await AoVivo.definirCep(corpo.cep); this._fol = null; return AoVivo.info(); } catch (e) { return {erro: e.message}; }
+        }
+        return AoVivo.ativo && AoVivo.local ? AoVivo.info() : (this.meta.local || {endereco: null});
       case "dados": throw new Error("sem servidor");   // favoritos e lista ficam só no aparelho
       case "favoritos/precos": {
         const out = {};
         for (const f of corpo.favoritos || []) {
-          const atual = this.porChave(f.k);
-          let alts = this.consultar(f.termo || f.nome, {limite: 200}).filter(p => chave(p) !== f.k);
+          const {produtos} = await this.produtosPara(f.termo || f.nome);
+          const atual = produtos.find(p => chave(p) === f.k) || (AoVivo.ativo ? null : this.porChave(f.k));
+          let alts = produtos.filter(p => chave(p) !== f.k);
           let c = p => p.preco;
           if (atual?.preco_unidade) { alts = alts.filter(p => p.preco_unidade && p.unidade === atual.unidade); c = p => p.preco_unidade; }
           out[f.k] = {atual, alternativa: alts.length ? alts.reduce((a, b) => c(b) < c(a) ? b : a) : null};
         }
         return out;
       }
-      case "lista/precos": return {itens: (corpo.itens || []).map(it => {
+      case "lista/precos": return {itens: await Promise.all((corpo.itens || []).map(async it => {
+        const {produtos} = await this.produtosPara(it.texto || "");
         const por_mercado = {};
-        for (const p of this.consultar(it.texto || "", {limite: 400}))
+        for (const p of produtos)
           if (!por_mercado[p.mercado] || custoP(p) < custoP(por_mercado[p.mercado])) por_mercado[p.mercado] = p;
         const v = Object.values(por_mercado);
         return {por_mercado, melhor: v.length ? v.reduce((a, b) => custoP(b) < custoP(a) ? b : a) : null,
-                fixo: it.prod ? this.porChave(it.prod.k) : null};
-      })};
+                fixo: it.prod ? (produtos.find(p => chave(p) === it.prod.k) || null) : null};
+      }))};
       default: return {erro: "Disponível só no app do PC."};
     }
+  },
+};
+
+// ---------- utilidades compartilhadas (mesma lógica do Python em coletores/base.py e db.py)
+function raizesBusca(q) {
+  return semAcento(q).split(/\s+/).filter(w => w.length >= 2).map(w => {
+    let r = w.length > 4 && w.endsWith("s") ? w.slice(0, -1) : w;
+    return r.length > 4 && "aeo".includes(r.at(-1)) ? r.slice(0, -1) : r;
+  });
+}
+function preparar(p) { p.nome_busca = semAcento(p.nome + " " + (p.marca || "")); return p; }
+function quantidade(nome) {
+  const re = /(?:(\d+)\s*(?:x|un\w*\s*de)\s*)?(\d+(?:[.,]\d+)?)\s*(kg|kilo|g|gr|gramas|mg|l|lt|litros?|ml)\b/gi;
+  let m, ult = null;
+  while ((m = re.exec(semAcento(nome)))) ult = m;
+  if (!ult) return [null, ""];
+  const v = parseFloat(ult[2].replace(",", ".")) * (ult[1] ? +ult[1] : 1), u = ult[3].toLowerCase();
+  if (["g", "gr", "gramas"].includes(u)) return [v / 1000, "kg"];
+  if (u === "mg") return [null, ""];
+  if (["kg", "kilo"].includes(u)) return [v, "kg"];
+  if (u === "ml") return [v / 1000, "L"];
+  return [v, "L"];
+}
+function finalizar(p) {
+  p.desconto = 0;
+  if (p.preco_de && p.preco_de > p.preco && p.preco > 0) p.desconto = Math.round(100 * (1 - p.preco / p.preco_de));
+  else p.preco_de = null;
+  const [qtd, un] = quantidade(p.nome);
+  p.unidade = qtd && p.preco ? un : ""; p.preco_unidade = qtd && p.preco ? Math.round(p.preco / qtd * 100) / 100 : null;
+  return p;
+}
+const reais = v => "R$ " + v.toFixed(2).replace(".", ",");
+
+// ---------- busca ao vivo nas lojas, pelo proxy do Cloudflare, com o CEP de cada aparelho
+const VTEX_LOJAS = {"Atacadão": "www.atacadao.com.br", "Sam's Club": "www.samsclub.com.br", "Mambo": "www.mambo.com.br",
+  "Oba Hortifruti": "www.obahortifruti.com.br", "Coop": "www.coopsupermercado.com.br", "Savegnago": "www.savegnago.com.br",
+  "Zaffari": "www.zaffari.com.br", "Swift": "www.swift.com.br"};
+const AoVivo = {
+  ativo: false, proxy: "", local: null, cache: new Map(),
+  iniciar(proxy) {
+    this.proxy = (proxy || "").replace(/\/$/, ""); this.ativo = !!this.proxy;
+    try { this.local = JSON.parse(localStorage.getItem("ofertas-local") || "null"); } catch {}
+  },
+  async pedir(url, corpo) {
+    const r = await fetch(this.proxy + "/?url=" + encodeURIComponent(url), corpo
+      ? {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(corpo)} : {});
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    return r;
+  },
+  json(url, corpo) { return this.pedir(url, corpo).then(r => r.json()); },
+  lojaAssai() {
+    const l = this.local?.endereco?.assai?.[0];
+    if (l) return l;
+    const padrao = Estatico.meta.local?.endereco?.assai?.[0];
+    return padrao || null;
+  },
+  info() {
+    const e = this.local?.endereco, reg = this.local?.regiao || {};
+    return {endereco: e, redes_regionalizadas: Object.fromEntries(Object.entries(VTEX_LOJAS).map(([n, h]) => [n, !!reg.vtex?.[h]])),
+            pao_de_acucar: reg.gpa?.nome || null};
+  },
+  async definirCep(cepTxt) {
+    const cep = (cepTxt || "").replace(/\D/g, "");
+    if (cep.length !== 8) throw new Error("CEP deve ter 8 números");
+    const e = {cep, rua: "", bairro: "", cidade: "", uf: "", lat: null, lon: null};
+    try {
+      const d = await fetch(`https://brasilapi.com.br/api/cep/v2/${cep}`).then(r => { if (!r.ok) throw 0; return r.json(); });
+      Object.assign(e, {rua: d.street || "", bairro: d.neighborhood || "", cidade: d.city || "", uf: d.state || ""});
+      const c = Object.fromEntries(Object.entries(d.location?.coordinates || {}).map(([k, v]) => [k, +v]));
+      // a BrasilAPI devolve o marco zero de SP quando não sabe a coordenada exata: nesse caso usa o OpenStreetMap
+      const generica = Math.abs(c.latitude + 23.5475) < 0.002 && Math.abs(c.longitude + 46.6361) < 0.002;
+      if (c.latitude && c.longitude && !generica) Object.assign(e, {lat: +c.latitude, lon: +c.longitude});
+    } catch {
+      const d = await fetch(`https://viacep.com.br/ws/${cep}/json/`).then(r => r.json()).catch(() => ({erro: true}));
+      if (d.erro) throw new Error("CEP não encontrado");
+      Object.assign(e, {rua: d.logradouro || "", bairro: d.bairro || "", cidade: d.localidade || "", uf: d.uf || ""});
+    }
+    if (e.lat == null && e.cidade) {
+      // rua + bairro (o bairro evita ruas homônimas em outro lado da cidade), senão só o bairro
+      for (const q of [[e.rua, e.bairro, e.cidade, e.uf], [e.bairro, e.cidade, e.uf]].map(l => l.filter(Boolean).join(", "))) {
+        try {
+          const r = await fetch("https://nominatim.openstreetmap.org/search?" + new URLSearchParams({q, countrycodes: "br", format: "json", limit: 1})).then(r => r.json());
+          if (r.length) { e.lat = +r[0].lat; e.lon = +r[0].lon; break; }
+        } catch {}
+      }
+    }
+    // região de entrega de cada rede
+    const regiao = {vtex: {}, gpa: null};
+    await Promise.all([
+      ...Object.values(VTEX_LOJAS).map(h => this.json(`https://${h}/api/checkout/pub/regions?country=BRA&postalCode=${cep}`)
+        .then(r => { regiao.vtex[h] = r[0]?.id || ""; }).catch(() => {})),
+      this.json(`https://api.vendas.gpa.digital/pa/delivery/options?zipCode=${cep}`).then(d => {
+        const t = d.content?.deliveryTypes?.[0]; if (t) regiao.gpa = {id: t.storeid, nome: t.storeName || ""};
+      }).catch(() => {}),
+    ]);
+    // Assaí mais próximo
+    if (e.lat != null) {
+      const rad = Math.PI / 180, dist = l => 12742 * Math.asin(Math.sqrt(0.5 - Math.cos((l.lat - e.lat) * rad) / 2
+        + Math.cos(e.lat * rad) * Math.cos(l.lat * rad) * (1 - Math.cos((l.lon - e.lon) * rad)) / 2));
+      e.assai = (Estatico.meta.assai_lojas || []).map(l => ({...l, km: Math.round(dist(l) * 10) / 10})).sort((a, b) => a.km - b.km).slice(0, 5);
+    }
+    this.local = {endereco: e, regiao};
+    this.cache.clear();
+    try { localStorage.setItem("ofertas-local", JSON.stringify(this.local)); } catch {}
+  },
+  // busca o termo nas 11 lojas ao mesmo tempo; guarda o resultado por 30 min
+  async buscar(termo, n = 24) {
+    const k = semAcento(termo).trim(), salvo = this.cache.get(k);
+    if (salvo && Date.now() - salvo.t < 30 * 60e3) return salvo.r;
+    const fontes = {"Pão de Açúcar": () => this.gpa(termo, n), "Tenda Atacado": () => this.tenda(termo, n), "Sonda": () => this.sonda(termo, n),
+      ...Object.fromEntries(Object.entries(VTEX_LOJAS).map(([m, h]) => [m, () => this.vtex(m, h, termo, n)]))};
+    const produtos = [], erros = {};
+    await Promise.all(Object.entries(fontes).map(async ([m, f]) => {
+      try { produtos.push(...(await f()).map(p => preparar(finalizar({origem: "site", validade: "", extra: "", marca: "", imagem: "", ...p})))); }
+      catch (e) { erros[m] = e.message; }
+    }));
+    const r = {produtos, erros};
+    this.cache.set(k, {t: Date.now(), r});
+    return r;
+  },
+  async vtex(mercado, host, termo, n) {
+    let url = `https://${host}/api/io/_v/api/intelligent-search/product_search/?query=${encodeURIComponent(termo)}&count=${n}&locale=pt-BR`;
+    const rid = this.local?.regiao?.vtex?.[host];
+    if (rid) url += "&regionId=" + encodeURIComponent(rid);
+    const d = await this.json(url);
+    return (d.products || []).flatMap(p => {
+      const item = p.items?.[0], o = item?.sellers?.[0]?.commertialOffer;
+      if (!o || !o.Price || o.AvailableQuantity === 0) return [];
+      return [{mercado, nome: p.productName || "", preco: o.Price, preco_de: o.ListPrice, marca: p.brand || "",
+               imagem: item.images?.[0]?.imageUrl || "", url: `https://${host}/${p.linkText || ""}/p`}];
+    });
+  },
+  async gpa(termo, n) {
+    const d = await this.json("https://api.vendas.gpa.digital/pa/search/search", {terms: termo, page: 1, sortBy: "relevance",
+      resultsPerPage: n, allowRedirect: false, storeId: this.local?.regiao?.gpa?.id || 461, department: "ecom", customerPlus: true, partner: "linx"});
+    return (d.products || []).filter(p => p.stock && p.price).map(p => {
+      const promo = p.productPromotion || {};
+      let img = (p.productImages || [""])[0];
+      if (img.startsWith("/")) img = "https://static.paodeacucar.com" + img;
+      return {mercado: "Pão de Açúcar", nome: p.name || "", preco: p.price, preco_de: p.priceFrom, marca: p.brand || "", imagem: img,
+        url: p.urlDetails || "", validade: (promo.endDate || "").slice(0, 10),
+        extra: promo.promotionQuantityBuy && promo.promotionQuantityPayFor ? `leve ${promo.promotionQuantityBuy} pague ${promo.promotionQuantityPayFor}` : ""};
+    });
+  },
+  async tenda(termo, n) {
+    const d = await this.json(`https://api.tendaatacado.com.br/api/public/store/search?query=${encodeURIComponent(termo)}&page=1&order=relevance&save=true`);
+    return (d.products || []).slice(0, n).filter(p => p.availability === "in_stock" && p.price).map(p => {
+      let extra = "";
+      for (const pr of p.promotions || []) {
+        const t = pr.restriction?.title || "";
+        if (pr.price && pr.price < p.price && t) extra = `${reais(pr.price)} (${t})`;
+      }
+      const at = (p.wholesalePrices || []).reduce((a, w) => !a || (w.price || 1e9) < a.price ? w : a, null);
+      if (at?.price && at.minQuantity) extra = (extra ? extra + "; " : "") + `a partir de ${at.minQuantity} un: ${reais(at.price)}`;
+      return {mercado: "Tenda Atacado", nome: p.name || "", preco: p.price, marca: p.brand || "", imagem: p.thumbnail || "", url: p.url || "", extra};
+    });
+  },
+  async sonda(termo, n) {
+    const base = "https://www.sondadelivery.com.br";
+    const h = await this.pedir(`${base}/delivery/busca/${encodeURIComponent(termo)}`).then(r => r.text());
+    const i = h.indexOf('"view_item_list"');
+    const lista = i >= 0 ? h.slice(i, h.indexOf("<\/script>", i)) : "";
+    const re = /item_id:\s*"(\d+)",\s*item_name:\s*"(.*?)",.*?discount:\s*([\d.]+),.*?price:\s*([\d.]+)/gs;
+    const txt = document.createElement("textarea"), out = [];
+    let m;
+    while ((m = re.exec(lista)) && out.length < n) {
+      const [, pid, nome, desc, preco] = m;
+      const link = h.match(new RegExp(`href="(/delivery/produto/[^"]+/${pid})"`));
+      let img = "";
+      if (link) {
+        const j = h.indexOf(link[0]);
+        const mi = h.slice(j, j + 3000).match(/(?:data-srcset|data-src|src)="(https?:\/\/[^"]+\.(?:jpe?g|png|webp)[^"]*)"/i);
+        img = mi ? mi[1] : "";
+      }
+      txt.innerHTML = nome;
+      out.push({mercado: "Sonda", nome: txt.value, preco: +preco, preco_de: +desc ? Math.round((+preco + +desc) * 100) / 100 : null,
+        imagem: img, url: link ? base + link[1] : `${base}/delivery/busca/${encodeURIComponent(termo)}`});
+    }
+    return out;
   },
 };
 async function apiFetch(caminho, opts = {}) {
   if (!Estatico.ativo) return fetch(caminho, opts);
   const corpo = opts.body ? JSON.parse(opts.body) : (opts.method === "POST" ? {} : null);
-  const dados = Estatico.responder(caminho, corpo);
+  const dados = await Estatico.responder(caminho, corpo);
   return {ok: true, json: async () => dados};
 }
 
@@ -612,7 +820,7 @@ function mostrarCep(info) {
   if (!e) { $("#resumoCep").innerHTML = ""; return; }
   const reg = Object.entries(info.redes_regionalizadas || {}).filter(([, v]) => v).map(([m]) => m);
   const assai = (e.assai || [])[0];
-  $("#resumoCep").innerHTML = (Estatico.ativo ? "<b>Na versão online o CEP é fixo</b>: os preços são coletados uma vez por dia para a região abaixo. Para usar outro CEP, abra o app no PC.<br><br>" : "") +
+  $("#resumoCep").innerHTML = (Estatico.ativo && !AoVivo.ativo ? "<b>Na versão online o CEP é fixo</b>: os preços são coletados uma vez por dia para a região abaixo. Para usar outro CEP, abra o app no PC.<br><br>" : "") +
     `Atual: ${esc([e.rua, e.bairro, e.cidade].filter(Boolean).join(", "))}<br>
     Preços ajustados para sua região: ${esc(reg.join(", ") || "nenhuma")}${info.pao_de_acucar ? `, Pão de Açúcar (loja ${esc(info.pao_de_acucar)})` : "<br>Pão de Açúcar não entrega neste CEP; mostrando a loja padrão."}
     ${assai ? `<br>Assaí mais perto: ${esc(assai.nome)} (${assai.km} km)` : ""}`;
@@ -662,12 +870,17 @@ function acompanhar() { if (!timer) timer = setInterval(status, 1500); status();
 
 (async () => {
   await Estatico.iniciar();
-  if (Estatico.ativo && Estatico.meta.gerado_em) {
+  if (AoVivo.ativo) {
+    $("#infoBusca").textContent = "Busca ao vivo nas lojas online, com os preços do seu CEP. Folhetos e Ofertas são atualizados todo dia.";
+  } else if (Estatico.ativo && Estatico.meta.gerado_em) {
     const d = new Date(Estatico.meta.gerado_em);
     $("#infoBusca").textContent = `Preços coletados em ${d.toLocaleDateString("pt-BR")} às ${d.toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}. Atualiza sozinho todo dia.`;
   }
   await Dados.carregar();
-  apiFetch("/api/local").then(r => r.json()).then(info => { mostrarCep(info); if (!info.endereco) $("#btnCep").click(); }).catch(() => {});
+  apiFetch("/api/local").then(r => r.json()).then(info => {
+    mostrarCep(info);
+    if (!info.endereco || (AoVivo.ativo && !AoVivo.local)) $("#btnCep").click();   // pede o CEP na primeira visita
+  }).catch(() => {});
   const s = await status();
   montarLojasAssai(s);
   $("#mercadoOf").innerHTML += [...s.mercados_online, ...s.mercados_folheto].map(m => `<option>${esc(m)}</option>`).join("");

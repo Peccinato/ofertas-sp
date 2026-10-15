@@ -28,6 +28,8 @@ jobs:
       - name: Coletar preços e gerar o site
         env:
           OFERTAS_CEP: ${{ vars.OFERTAS_CEP }}
+          OFERTAS_PROXY: ${{ vars.OFERTAS_PROXY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
         run: python gerar_site.py
