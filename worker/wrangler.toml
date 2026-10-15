@@ -1,3 +1,7 @@
 name = "ofertas-sp-proxy"
 main = "proxy.js"
 compatibility_date = "2026-09-01"
+
+# roda perto de São Paulo: o servidor de imagens do Assaí só aceita acessos do Brasil
+[placement]
+region = "aws:sa-east-1"
