@@ -1,0 +1,17 @@
+name: Testar redes
+
+on:
+  workflow_dispatch:
+  push:
+    paths: ["coletores/**", "teste_redes.py", ".github/workflows/teste-redes.yml"]
+
+jobs:
+  testar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Testar cada rede
+        run: python teste_redes.py | tee -a "$GITHUB_STEP_SUMMARY"

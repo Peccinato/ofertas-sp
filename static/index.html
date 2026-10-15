@@ -1,0 +1,283 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ofertas SP</title>
+<style>
+  :root {
+    --bg: #f6f5f2; --card: #fff; --txt: #1d1d1b; --sub: #6b6b66; --linha: #e6e4de;
+    --acento: #0f7b4f; --acento-2: #e7f4ed; --verm: #c2410c; --verm-2: #fdece3; --raio: 12px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #151514; --card: #1f1f1d; --txt: #ecebe7; --sub: #a3a29c; --linha: #33322f;
+            --acento: #4ec38d; --acento-2: #1c3328; --verm: #fb8a4c; --verm-2: #3a2418; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--txt); }
+  header { position: sticky; top: 0; z-index: 5; background: var(--card); border-bottom: 1px solid var(--linha); }
+  .topo { max-width: 1100px; margin: 0 auto; padding: 12px 16px 0; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  h1 { font-size: 19px; margin: 0; letter-spacing: -.01em; }
+  h1 span { color: var(--acento); }
+  nav { max-width: 1100px; margin: 0 auto; padding: 0 16px; display: flex; gap: 4px; }
+  nav button { background: none; border: 0; border-bottom: 3px solid transparent; padding: 10px 12px; font: inherit; color: var(--sub); cursor: pointer; }
+  nav button.ativo { color: var(--txt); border-color: var(--acento); font-weight: 600; }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  .painel { display: none; } .painel.ativo { display: block; }
+  .barra { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+  input[type=search], select { font: inherit; padding: 10px 12px; border: 1px solid var(--linha); border-radius: 10px; background: var(--card); color: var(--txt); }
+  input[type=search] { flex: 1; min-width: 200px; }
+  button.btn { font: inherit; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--acento); background: var(--acento); color: #fff; cursor: pointer; font-weight: 600; }
+  button.btn.sec { background: var(--card); color: var(--acento); }
+  button.btn:disabled { opacity: .5; cursor: default; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .chip { font: inherit; font-size: 13px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--linha); background: var(--card); color: var(--txt); cursor: pointer; }
+  .chip.off { opacity: .4; text-decoration: line-through; }
+  .chip .n { color: var(--sub); margin-left: 4px; }
+  .info { color: var(--sub); font-size: 13px; margin: 6px 0 12px; }
+  .aviso { background: var(--verm-2); color: var(--verm); padding: 10px 12px; border-radius: 10px; font-size: 13px; margin-bottom: 12px; }
+  .lista { display: grid; gap: 8px; }
+  .item { display: grid; grid-template-columns: 56px 1fr auto; gap: 12px; align-items: center; background: var(--card); border: 1px solid var(--linha); border-radius: var(--raio); padding: 10px 12px; }
+  .item img { width: 56px; height: 56px; object-fit: contain; border-radius: 8px; background: #fff; }
+  .item .nome { font-weight: 500; }
+  .item .nome a { color: inherit; text-decoration: none; } .item .nome a:hover { text-decoration: underline; }
+  .meta { font-size: 12.5px; color: var(--sub); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 3px; }
+  .tag { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 2px 7px; border-radius: 6px; color: #fff; }
+  .tag.desc { background: var(--verm-2); color: var(--verm); }
+  .tag.fol { background: var(--acento-2); color: var(--acento); }
+  .preco { text-align: right; white-space: nowrap; }
+  .preco b { font-size: 18px; } .preco s { color: var(--sub); font-size: 12.5px; display: block; }
+  .preco small { color: var(--sub); display: block; font-size: 12px; }
+  .item.top { border-color: var(--acento); box-shadow: 0 0 0 1px var(--acento) inset; }
+  .grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
+  .folheto { background: var(--card); border: 1px solid var(--linha); border-radius: var(--raio); overflow: hidden; }
+  .folheto img { width: 100%; aspect-ratio: 3/4; object-fit: cover; object-position: top; display: block; background: #fff; }
+  .folheto > div { padding: 8px 10px; font-size: 13px; }
+  .folheto .pdf { aspect-ratio: 3/4; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    background: var(--acento-2); color: var(--acento); font-weight: 700; font-size: 28px; text-align: center; padding: 12px; }
+  .folheto .pdf small { font-size: 13px; font-weight: 500; color: var(--sub); }
+  .folheto a { color: inherit; text-decoration: none; }
+  .progresso { height: 6px; background: var(--linha); border-radius: 3px; overflow: hidden; margin: 8px 0; }
+  .progresso i { display: block; height: 100%; background: var(--acento); width: 0; transition: width .4s; }
+  .vazio { text-align: center; color: var(--sub); padding: 40px 0; }
+  @media (max-width: 560px) {
+    .item { grid-template-columns: 44px 1fr; } .item img { width: 44px; height: 44px; }
+    .preco { grid-column: 2; text-align: left; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="topo"><h1>Ofertas <span>SP</span></h1><span class="info" id="resumo" style="margin:0"></span></div>
+  <nav>
+    <button class="ativo" data-aba="comparar">Comparar preços</button>
+    <button data-aba="ofertas">Ofertas</button>
+    <button data-aba="folhetos">Folhetos</button>
+  </nav>
+</header>
+<main>
+  <!-- COMPARAR -->
+  <section class="painel ativo" id="comparar">
+    <form class="barra" id="formBusca">
+      <input type="search" id="q" placeholder="Ex.: arroz 5kg, café pilão 500g, leite integral" autofocus>
+      <select id="ordem">
+        <option value="unidade">Menor preço por kg/L</option>
+        <option value="preco">Menor preço</option>
+      </select>
+      <button class="btn">Buscar</button>
+    </form>
+    <div class="chips" id="sugestoes"></div>
+    <div class="chips" id="filtroMercados"></div>
+    <div id="avisoBusca"></div>
+    <div class="info" id="infoBusca">Busca nas lojas online de várias redes e nos folhetos já lidos.</div>
+    <div class="lista" id="resultado"></div>
+  </section>
+
+  <!-- OFERTAS -->
+  <section class="painel" id="ofertas">
+    <div class="barra">
+      <input type="search" id="qOf" placeholder="Filtrar ofertas…">
+      <select id="mercadoOf"><option value="">Todos os mercados</option></select>
+      <select id="origemOf"><option value="">Site + folheto</option><option value="site">Só sites</option><option value="folheto">Só folhetos</option></select>
+      <select id="ordemOf"><option value="desconto">Maior desconto</option><option value="unidade">Menor preço por kg/L</option><option value="preco">Menor preço</option></select>
+      <button class="btn sec" id="btnAtualOf">Atualizar ofertas</button>
+    </div>
+    <div id="progOf"></div>
+    <div class="info" id="infoOf"></div>
+    <div class="lista" id="listaOf"></div>
+  </section>
+
+  <!-- FOLHETOS -->
+  <section class="painel" id="folhetos">
+    <div class="barra">
+      <label class="info" style="margin:0">Loja Assaí:</label>
+      <select id="lojaAssai"></select>
+      <button class="btn sec" id="btnAtualFol">Buscar folhetos novos</button>
+      <button class="btn" id="btnLerFol">Ler folhetos com IA</button>
+    </div>
+    <div id="avisoIA"></div>
+    <div id="progFol"></div>
+    <div class="info" id="infoFol"></div>
+    <div class="grade" id="gradeFol"></div>
+  </section>
+</main>
+
+<script>
+const CORES = {"Pão de Açúcar":"#b5121b","Tenda Atacado":"#e85d04","Atacadão":"#d62828","Sam's Club":"#0067a0",
+  "Mambo":"#2b9348","Oba Hortifruti":"#6a994e","Coop":"#1d4e89","Savegnago":"#c1121f","Zaffari":"#7b2cbf",
+  "Assaí":"#f77f00","Roldão":"#003f88","Sonda":"#e30613","Swift":"#c8102e","Akki":"#f4a300",
+  "Lopes":"#00843d","Max Atacadista":"#e4002b"};
+const SUGESTOES = ["arroz 5kg","feijão carioca 1kg","café 500g","leite integral","óleo de soja","açúcar 5kg","ovos","cerveja lata","papel higiênico","sabão em pó"];
+const $ = s => document.querySelector(s);
+const brl = v => v == null ? "" : v.toLocaleString("pt-BR", {style:"currency", currency:"BRL"});
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+let estado = {produtos: [], ocultos: new Set(), status: null};
+
+// abas
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button, .painel").forEach(x => x.classList.remove("ativo"));
+  b.classList.add("ativo"); $("#" + b.dataset.aba).classList.add("ativo");
+  if (b.dataset.aba === "ofertas") carregarOfertas();
+  if (b.dataset.aba === "folhetos") carregarFolhetos();
+});
+
+function itemHTML(p, destaque) {
+  const cor = CORES[p.mercado] || "#555";
+  const unid = p.preco_unidade ? `<small>${brl(p.preco_unidade)}/${p.unidade}</small>` : "";
+  const de = p.preco_de ? `<s>${brl(p.preco_de)}</s>` : "";
+  const tags = [
+    `<span class="tag" style="background:${cor}">${esc(p.mercado)}</span>`,
+    p.desconto > 0 ? `<span class="tag desc">-${Math.round(p.desconto)}%</span>` : "",
+    p.origem === "folheto" ? `<span class="tag fol">folheto</span>` : "",
+    p.extra ? `<span>${esc(p.extra)}</span>` : "",
+    p.validade ? `<span>${esc(p.validade)}</span>` : "",
+  ].join("");
+  const img = p.origem === "folheto" ? "" : esc(p.imagem);
+  return `<div class="item${destaque ? " top" : ""}">
+    ${img ? `<img loading="lazy" src="${img}" alt="">` : `<img alt="" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'/>">`}
+    <div><div class="nome"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.nome)}</a></div><div class="meta">${tags}</div></div>
+    <div class="preco">${de}<b>${brl(p.preco)}</b>${unid}</div></div>`;
+}
+
+function ordenar(lista, ordem) {
+  const k = ordem === "desconto" ? p => -(p.desconto || 0)
+          : ordem === "unidade" ? p => p.preco_unidade ?? p.preco * 1000
+          : p => p.preco;
+  return [...lista].sort((a, b) => k(a) - k(b));
+}
+
+// ---------- comparar
+$("#sugestoes").innerHTML = SUGESTOES.map(s => `<button class="chip" type="button">${s}</button>`).join("");
+$("#sugestoes").onclick = e => { if (e.target.matches(".chip")) { $("#q").value = e.target.textContent; buscar(); } };
+$("#formBusca").onsubmit = e => { e.preventDefault(); buscar(); };
+$("#ordem").onchange = desenharBusca;
+
+async function buscar(forcar) {
+  const q = $("#q").value.trim(); if (!q) return;
+  $("#infoBusca").textContent = "Buscando em todas as redes…"; $("#resultado").innerHTML = ""; $("#avisoBusca").innerHTML = "";
+  const r = await fetch(`/api/buscar?q=${encodeURIComponent(q)}${forcar ? "&forcar=1" : ""}`).then(r => r.json());
+  if (r.erro) { $("#infoBusca").textContent = "Erro: " + r.erro; return; }
+  estado.produtos = r.produtos;
+  const erros = Object.entries(r.erros || {});
+  if (erros.length) $("#avisoBusca").innerHTML = `<div class="aviso">Não responderam agora: ${erros.map(([m]) => esc(m)).join(", ")}</div>`;
+  desenharBusca(); status();
+}
+
+function desenharBusca() {
+  const todos = estado.produtos;
+  const cont = {}; todos.forEach(p => cont[p.mercado] = (cont[p.mercado] || 0) + 1);
+  $("#filtroMercados").innerHTML = Object.keys(cont).sort().map(m =>
+    `<button class="chip${estado.ocultos.has(m) ? " off" : ""}" data-m="${esc(m)}" type="button"><span style="color:${CORES[m]||"inherit"}">●</span> ${esc(m)}<span class="n">${cont[m]}</span></button>`).join("");
+  const lista = ordenar(todos.filter(p => !estado.ocultos.has(p.mercado)), $("#ordem").value);
+  $("#infoBusca").innerHTML = todos.length
+    ? `${lista.length} produtos · <a href="#" id="refazer">buscar de novo nos sites</a>`
+    : "Nada encontrado. Tente um termo mais simples (ex.: “arroz” em vez de “arroz tipo 1 5kg camil”).";
+  const ref = $("#refazer"); if (ref) ref.onclick = e => { e.preventDefault(); buscar(true); };
+  $("#resultado").innerHTML = lista.slice(0, 300).map((p, i) => itemHTML(p, i === 0)).join("");
+}
+$("#filtroMercados").onclick = e => {
+  const c = e.target.closest(".chip"); if (!c) return;
+  const m = c.dataset.m; estado.ocultos.has(m) ? estado.ocultos.delete(m) : estado.ocultos.add(m); desenharBusca();
+};
+
+// ---------- ofertas
+let ofertas = [];
+async function carregarOfertas() {
+  const p = new URLSearchParams({mercado: $("#mercadoOf").value, origem: $("#origemOf").value});
+  ofertas = (await fetch("/api/ofertas?" + p).then(r => r.json())).produtos || [];
+  desenharOfertas();
+}
+function desenharOfertas() {
+  const q = $("#qOf").value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  let lista = ofertas.filter(p => !q || (p.nome_busca || "").includes(q));
+  lista = ordenar(lista, $("#ordemOf").value);
+  $("#infoOf").textContent = ofertas.length
+    ? `${lista.length} ofertas (produtos com desconto, promoção ou vindos de folheto).`
+    : "Nenhuma oferta salva ainda. Clique em “Atualizar ofertas” para varrer uma cesta de ~40 itens em todas as redes (leva 1–3 min).";
+  $("#listaOf").innerHTML = lista.slice(0, 400).map(p => itemHTML(p)).join("");
+}
+["#mercadoOf", "#origemOf"].forEach(s => $(s).onchange = carregarOfertas);
+$("#ordemOf").onchange = desenharOfertas; $("#qOf").oninput = desenharOfertas;
+$("#btnAtualOf").onclick = async () => { await fetch("/api/ofertas/atualizar", {method: "POST"}); acompanhar(); };
+
+// ---------- folhetos
+async function carregarFolhetos() {
+  const r = await fetch("/api/folhetos").then(r => r.json());
+  const fs = r.folhetos || [];
+  $("#infoFol").textContent = fs.length ? `${fs.length} páginas de folhetos vigentes. Clique numa página para abrir em tamanho real.` : "Nenhum folheto carregado. Clique em “Buscar folhetos novos”.";
+  $("#gradeFol").innerHTML = fs.map(f => {
+    const st = f.status === "lido" ? `<span class="tag fol">${f.n_itens} produtos lidos</span>`
+             : f.status === "erro" ? `<span class="tag desc" title="${esc(f.erro)}">erro na leitura</span>` : `<span class="meta">não lido</span>`;
+    const capa = /\.pdf$/i.test(f.imagem)
+      ? `<div class="pdf">PDF<small>${esc(f.titulo)}</small></div>`
+      : `<img loading="lazy" src="${esc(f.imagem)}" alt="">`;
+    return `<div class="folheto"><a href="${esc(f.imagem)}" target="_blank" rel="noopener">${capa}</a>
+      <div><span class="tag" style="background:${CORES[f.mercado]||"#555"}">${esc(f.mercado)}</span> ${esc(f.loja)} · pág. ${f.pagina}
+      <div class="meta">${esc(f.validade)}</div><div class="meta">${st}</div></div></div>`;
+  }).join("");
+}
+$("#btnAtualFol").onclick = async () => {
+  $("#btnAtualFol").disabled = true; $("#infoFol").textContent = "Buscando folhetos…";
+  const r = await fetch("/api/folhetos/atualizar", {method: "POST", body: JSON.stringify({loja_assai: $("#lojaAssai").value})}).then(r => r.json());
+  $("#btnAtualFol").disabled = false;
+  const erros = Object.entries(r.erros || {});
+  $("#progFol").innerHTML = erros.length ? `<div class="aviso">Falhou: ${erros.map(([m, e]) => esc(m + " (" + e + ")")).join(", ")}</div>` : "";
+  carregarFolhetos();
+};
+$("#btnLerFol").onclick = async () => {
+  const r = await fetch("/api/folhetos/ler", {method: "POST", body: "{}"}).then(r => r.json());
+  if (r.erro) { $("#avisoIA").innerHTML = `<div class="aviso">${esc(r.erro)}</div>`; return; }
+  acompanhar();
+};
+
+// ---------- status / progresso
+let timer = null;
+async function status() {
+  const s = await fetch("/api/status").then(r => r.json()); estado.status = s;
+  const t = s.trabalho, rodando = t.tarefa && !t.fim;
+  const barra = rodando ? `<div class="info">${esc(t.tarefa)}: ${t.feito}/${t.total}</div><div class="progresso"><i style="width:${t.total ? 100 * t.feito / t.total : 5}%"></i></div>` : "";
+  const alvo = t.tarefa.includes("folheto") ? "#progFol" : "#progOf";
+  if (rodando) $(alvo).innerHTML = barra;
+  $("#btnAtualOf").disabled = $("#btnLerFol").disabled = rodando;
+  const total = s.contagens.reduce((a, c) => a + c.n, 0);
+  $("#resumo").textContent = `${s.mercados_online.length + s.mercados_folheto.length} redes · ${total.toLocaleString("pt-BR")} preços salvos`;
+  $("#avisoIA").innerHTML = s.ia ? "" : `<div class="aviso">A leitura automática de folhetos está desligada: ${esc(s.ia_motivo)}. Veja o LEIAME.md. Sem ela, os folhetos aparecem só como imagens.</div>`;
+  if (!rodando && timer) {
+    clearInterval(timer); timer = null;
+    if (t.erros.length) $(alvo).innerHTML = `<div class="aviso">${t.erros.length} falha(s): ${esc(t.erros.slice(0, 5).join(" · "))}</div>`;
+    else $(alvo).innerHTML = "";
+    carregarOfertas(); carregarFolhetos();
+  }
+  return s;
+}
+function acompanhar() { if (!timer) timer = setInterval(status, 1500); status(); }
+
+(async () => {
+  const s = await status();
+  $("#lojaAssai").innerHTML = s.lojas_assai.map(l => `<option${l === s.loja_assai ? " selected" : ""}>${esc(l)}</option>`).join("");
+  $("#mercadoOf").innerHTML += [...s.mercados_online, ...s.mercados_folheto].map(m => `<option>${esc(m)}</option>`).join("");
+  if (s.trabalho.tarefa && !s.trabalho.fim) acompanhar();
+})();
+</script>
+</body>
+</html>
