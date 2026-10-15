@@ -1,18 +1,22 @@
 """Utilitários compartilhados pelos coletores."""
+from http.client import HTTPException
 import json
+import os
 import re
 import time
 import unicodedata
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass, asdict, field
 
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128 Safari/537.36"
 
 
-def http(url, data=None, headers=None, timeout=20, tentativas=2):
-    h = {"User-Agent": UA, "Accept": "application/json, text/html;q=0.9"}
-    h.update(headers or {})
+_pelo_proxy = set()   # sites que recusam este computador (ex.: GitHub nos EUA) e passam a ir direto pelo proxy
+
+
+def _http_direto(url, data, h, timeout, tentativas):
     for i in range(tentativas):
         req = urllib.request.Request(url, data=data, headers=h)
         try:
@@ -21,10 +25,32 @@ def http(url, data=None, headers=None, timeout=20, tentativas=2):
         except urllib.error.HTTPError as e:
             if e.code < 500 or i == tentativas - 1:
                 raise
-        except (urllib.error.URLError, TimeoutError):
+        except (urllib.error.URLError, TimeoutError, ConnectionError, HTTPException):
             if i == tentativas - 1:
                 raise
         time.sleep(1.5)
+
+
+def http(url, data=None, headers=None, timeout=20, tentativas=2):
+    h = {"User-Agent": UA, "Accept": "application/json, text/html;q=0.9"}
+    h.update(headers or {})
+    proxy = os.environ.get("OFERTAS_PROXY", "").rstrip("/")
+    host = urllib.parse.urlsplit(url).hostname
+    if proxy and host in _pelo_proxy:
+        return _http_direto(f"{proxy}/?url={urllib.parse.quote(url, safe='')}", data, h, timeout, tentativas)
+    try:
+        return _http_direto(url, data, h, timeout, tentativas)
+    except (urllib.error.URLError, TimeoutError, ConnectionError, HTTPException) as e:
+        # alguns sites bloqueiam servidores fora do Brasil; o proxy do Cloudflare roda em São Paulo
+        bloqueio = not isinstance(e, urllib.error.HTTPError) or e.code in (403, 429) or e.code >= 500
+        if not (proxy and bloqueio):
+            raise
+        try:
+            resp = _http_direto(f"{proxy}/?url={urllib.parse.quote(url, safe='')}", data, h, timeout, 1)
+        except Exception:
+            raise e from None
+        _pelo_proxy.add(host)
+        return resp
 
 
 def http_json(url, data=None, headers=None, timeout=20):
