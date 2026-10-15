@@ -79,13 +79,18 @@ _ESQUEMA_GEMINI = {
 _ultima_chamada = [0.0]
 
 
-_modelo = [GEMINI_MODELO]
+class CotaEsgotada(RuntimeError):
+    """A cota grátis do dia acabou em todos os modelos: o resto fica para a próxima execução."""
 
 
-def _modelo_gemini():
-    """O Google aposenta modelos com frequência: pergunta à API quais existem e usa o 'flash' estável mais novo."""
-    if _modelo[0]:
-        return _modelo[0]
+_fila = []   # modelos a usar, em ordem; os que esgotam a cota do dia são removidos
+
+
+def _modelos_gemini():
+    """O Google aposenta modelos com frequência: pergunta à API quais existem.
+    Usa o 'flash' estável mais novo e, quando a cota dele acaba, o 'flash-lite' (cota grátis maior)."""
+    if _fila or GEMINI_MODELO:
+        return _fila or [GEMINI_MODELO]
     nomes, pagina = [], ""
     while True:
         url = "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200" + (f"&pageToken={pagina}" if pagina else "")
@@ -97,15 +102,14 @@ def _modelo_gemini():
         pagina = d.get("nextPageToken")
         if not pagina:
             break
-    def versao(n):
-        m = re.fullmatch(r"gemini-(\d+(?:\.\d+)?)-flash", n)   # só o "flash" estável (sem lite/preview/exp/image)
-        return float(m.group(1)) if m else None
-    candidatos = sorted((v, n) for n in nomes if (v := versao(n)) is not None)
-    if not candidatos:
+    for sufixo in ("flash", "flash-lite"):   # só versões estáveis (sem preview/exp/image)
+        vs = [(float(m.group(1)), n) for n in nomes if (m := re.fullmatch(rf"gemini-(\d+(?:\.\d+)?)-{sufixo}", n))]
+        if vs:
+            _fila.append(max(vs)[1])
+    if not _fila:
         raise RuntimeError(f"nenhum modelo Gemini flash disponível ({', '.join(nomes[:8])}...)")
-    _modelo[0] = candidatos[-1][1]
-    print("  Gemini: usando", _modelo[0])
-    return _modelo[0]
+    print("  Gemini: modelos", " -> ".join(_fila))
+    return _fila
 
 
 def _baixar(url):
@@ -134,24 +138,35 @@ def _extrair_gemini(url):
                                 {"text": PROMPT}]}],
         "generationConfig": {"responseMimeType": "application/json", "responseSchema": _ESQUEMA_GEMINI, "temperature": 0},
     }).encode()
-    api = f"https://generativelanguage.googleapis.com/v1beta/models/{_modelo_gemini()}:generateContent"
-    for tentativa in range(4):
-        # o plano grátis limita as chamadas por minuto: espaça e, se estourar, espera e tenta de novo
+    d, tentativa = None, 0
+    while d is None:
+        fila = _modelos_gemini()
+        if not fila:
+            raise CotaEsgotada("cota grátis do Gemini esgotada hoje")
+        modelo = fila[0]
+        # o plano grátis também limita as chamadas por minuto: espaça as chamadas
         espera = 7 - (time.time() - _ultima_chamada[0])
         if espera > 0:
             time.sleep(espera)
         _ultima_chamada[0] = time.time()
+        api = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
         req = urllib.request.Request(api, data=corpo, headers={"Content-Type": "application/json",
                                                                "x-goog-api-key": os.environ["GEMINI_API_KEY"]})
         try:
             with urllib.request.urlopen(req, timeout=180) as r:
                 d = json.loads(r.read().decode("utf-8"))
-            break
         except urllib.error.HTTPError as e:
-            if e.code in (429, 500, 503) and tentativa < 3:
-                time.sleep(30 * (tentativa + 1))
-                continue
-            raise RuntimeError(f"Gemini HTTP {e.code}: {e.read().decode('utf-8', 'replace')[:200]}")
+            msg = e.read().decode("utf-8", "replace")
+            tentativa += 1
+            if e.code == 429 and re.search(r"PerDay|per day", msg, re.I):
+                print(f"  Gemini: cota do dia esgotada em {modelo}")
+                fila.pop(0)                      # passa para o próximo modelo (ou para de vez)
+                if not fila:
+                    raise CotaEsgotada("cota grátis do Gemini esgotada hoje")
+            elif e.code in (429, 500, 503) and tentativa <= 3:
+                time.sleep(60 if e.code == 429 else 20 * tentativa)   # limite por minuto ou instabilidade
+            else:
+                raise RuntimeError(f"Gemini HTTP {e.code} ({modelo}): {msg[:200]}")
     cand = (d.get("candidates") or [{}])[0]
     if cand.get("finishReason") not in (None, "STOP"):
         raise RuntimeError(f"Gemini parou: {cand.get('finishReason')}")

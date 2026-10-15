@@ -99,21 +99,27 @@ def main():
     cache = (baixar_json(cache_url) if os.environ.get("SITE_URL") else None) or {}
     lidos = {}
     ia_ok = extrator_ia.disponivel()[0]
-    for f in db.listar_folhetos():
+    novos = 0
+    for f in intercalar_por_mercado(db.listar_folhetos()):
         img = f["imagem"]
         try:
             if img in cache:
                 app.ler_folheto(img, itens=cache[img])
             elif ia_ok:
                 app.ler_folheto(img)
+                novos += 1
                 print("  lido com IA:", img.rsplit("/", 1)[-1])
             else:
                 continue
             lidos[img] = [{"nome": p["nome"], "preco": p["preco"], "preco_de": p["preco_de"], "condicao": p["extra"]}
                           for p in db.consultar(origem="folheto", limite=10**6) if p["fonte"] == img]
+        except extrator_ia.CotaEsgotada:
+            print("  Cota grátis da IA esgotada hoje; os folhetos restantes ficam para a próxima coleta.")
+            ia_ok = False
         except Exception as e:
             print("  ! folheto", img.rsplit("/", 1)[-1], e)
-    print("Folhetos lidos:", len(lidos), "(IA ligada)" if ia_ok else "(IA desligada; só reaproveitados)")
+    pendentes = len(db.listar_folhetos()) - len(lidos)
+    print(f"Folhetos lidos: {len(lidos)} ({novos} novos hoje, {pendentes} pendentes)")
 
     # exporta
     os.makedirs(os.path.join(SAIDA, "dados"), exist_ok=True)
@@ -137,6 +143,19 @@ def main():
     print(f"Pronto: {len(produtos)} preços em {SAIDA} ({time.time() - inicio:.0f}s)")
     if not produtos:
         sys.exit("Nenhum preço coletado; não publicar.")
+
+
+def intercalar_por_mercado(folhetos):
+    """Assaí, Max, Roldão, Assaí, Max, ...: com cota curta, cada rede recebe parte das leituras."""
+    grupos = {}
+    for f in folhetos:
+        grupos.setdefault(f["mercado"], []).append(f)
+    out = []
+    while any(grupos.values()):
+        for g in grupos.values():
+            if g:
+                out.append(g.pop(0))
+    return out
 
 
 def tabloides_assai(lojas_ids):
