@@ -15,7 +15,11 @@ VTEX = {
     "Savegnago": "www.savegnago.com.br",
     "Zaffari": "www.zaffari.com.br",
     "Swift": "www.swift.com.br",
+    "Covabra": "www.covabra.com.br",
+    "BOA": "boa.vtexcommercestable.com.br",   # a loja nova da BOA não expõe a API no próprio domínio
 }
+# domínio da loja para montar o link do produto, quando a API fica em outro endereço
+VTEX_SITE = {"boa.vtexcommercestable.com.br": "www.boasupermercados.com.br"}
 
 
 # Região do usuário (definida pelo CEP em coletores/local.py): host VTEX -> regionId, loja do Pão de Açúcar
@@ -44,7 +48,7 @@ def buscar_vtex(mercado, host, termo, n=24):
         out.append(Produto(
             mercado=mercado, nome=p.get("productName", ""), preco=preco,
             preco_de=oferta.get("ListPrice"), marca=p.get("brand", ""), imagem=img,
-            url=f"https://{host}/{p.get('linkText', '')}/p",
+            url=f"https://{VTEX_SITE.get(host, host)}/{p.get('linkText', '')}/p",
         ).finalizar())
     return out
 
@@ -154,11 +158,40 @@ def buscar_carrefour(termo, n=24):
     return out
 
 
-def fontes():
-    """Lista de (nome do mercado, função de busca)."""
+_PM_ITEM = re.compile(r'<div\s+class="item-product"')
+
+
+def buscar_paguemenos(termo, n=24):
+    # loja Convertize: a página de busca vem com os produtos no HTML
+    base = "https://www.superpaguemenos.com.br"
+    h = http(f"{base}/busca/?q={quote(termo)}", timeout=30)
+    blocos = [m.start() for m in _PM_ITEM.finditer(h)]
+    out = []
+    for i, ini in enumerate(blocos[:n]):
+        b = h[ini: blocos[i + 1] if i + 1 < len(blocos) else ini + 8000]
+        nome = re.search(r'<h2 class="title"><a href="([^"]+)">\s*(.*?)\s*</a>', b, re.S)
+        preco = re.search(r'class="sale-price"><strong>\s*' + _PRECO.pattern, b)
+        if not nome or not preco:
+            continue
+        de = re.search(r'class="unit-price[^"]*"><span>\s*' + _PRECO.pattern, b)
+        img = re.search(r'data-src="([^"]+)"', b)
+        out.append(Produto(
+            mercado="Pague Menos", nome=html.unescape(nome.group(2)).strip(), preco=_reais(preco.group(1)),
+            preco_de=_reais(de.group(1)) if de else None, imagem=("https:" + img.group(1)) if img else "",
+            url=base + nome.group(1),
+        ).finalizar())
+    return out
+
+
+def fontes(regiao=None):
+    """Lista de (nome do mercado, função de busca); com `regiao`, só as redes daquela região."""
+    from .regioes import REGIOES
     lista = [(m, lambda termo, n=24, _m=m: buscar_gpa(_m, termo, n)) for m in GPA]
     lista += [("Tenda Atacado", buscar_tenda), ("Sonda", buscar_sonda),
-             ("Carrefour", buscar_carrefour)]
+              ("Carrefour", buscar_carrefour), ("Pague Menos", buscar_paguemenos)]
     for nome, host in VTEX.items():
         lista.append((nome, lambda termo, n=24, _m=nome, _h=host: buscar_vtex(_m, _h, termo, n)))
+    if regiao:
+        redes = REGIOES[regiao]["online"]
+        lista = [(n, f) for n, f in lista if n in redes]
     return lista

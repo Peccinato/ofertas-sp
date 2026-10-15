@@ -20,6 +20,7 @@ import db
 from coletores import extrator_ia, local
 from coletores.base import Produto
 from coletores.folhetos import ASSAI_LOJAS_SP, todos_folhetos
+from coletores.regioes import REGIOES
 from coletores.sites import VTEX, fontes
 
 PORTA = int(sys.argv[sys.argv.index("--porta") + 1]) if "--porta" in sys.argv else \
@@ -42,11 +43,11 @@ _trab_lock = threading.Lock()
 
 # ---------------------------------------------------------------- coleta
 
-def buscar_ao_vivo(termo, n=24):
-    """Busca o termo em todas as lojas online em paralelo e salva no banco."""
+def buscar_ao_vivo(termo, n=24, regiao=None):
+    """Busca o termo nas lojas online (da região, se informada) em paralelo e salva no banco."""
     resultados, erros = [], {}
     with ThreadPoolExecutor(max_workers=10) as ex:
-        futs = {ex.submit(f, termo, n): nome for nome, f in fontes()}
+        futs = {ex.submit(f, termo, n): nome for nome, f in fontes(regiao)}
         for fut in as_completed(futs):
             try:
                 resultados += [p.dict() for p in fut.result()]
@@ -114,7 +115,7 @@ def ler_folheto(img, itens=None):
     db.status_folheto(img, "lido", "", len(prods))
 
 
-def definir_cep(cep, folhetos_em_segundo_plano=True):
+def definir_cep(cep, folhetos_em_segundo_plano=True, limpar=True):
     """Resolve o CEP, descobre a região de cada rede e o Assaí mais próximo."""
     end = local.resolver_cep(cep)
     reg = local.regioes(end["cep"])
@@ -131,10 +132,19 @@ def definir_cep(cep, folhetos_em_segundo_plano=True):
     if proximas:
         db.set_config("loja_assai", proximas[0]["nome"])
         db.set_config("loja_assai_id", str(proximas[0]["id"]))
-    db.limpar_precos_site()
+    if limpar:
+        db.limpar_precos_site()
     if folhetos_em_segundo_plano:
         threading.Thread(target=atualizar_folhetos, daemon=True).start()
     return info_local()
+
+
+def da_regiao(itens, regiao):
+    """Filtra produtos/folhetos pelas redes da região (sem região: tudo)."""
+    if regiao not in REGIOES:
+        return itens
+    redes = set(REGIOES[regiao]["online"]) | set(REGIOES[regiao]["folhetos"])
+    return [i for i in itens if i["mercado"] in redes]
 
 
 def info_local():
@@ -256,14 +266,16 @@ class Handler(SimpleHTTPRequestHandler):
                 if not termo:
                     return self._json({"produtos": [], "erros": {}})
                 erros = {}
-                if q.get("forcar") == "1" or not db.busca_recente(termo):
-                    erros = buscar_ao_vivo(termo)
-                return self._json({"produtos": db.consultar(termo, limite=600, max_idade_h=24 * 7), "erros": erros})
+                reg = q.get("regiao") if q.get("regiao") in REGIOES else None
+                if q.get("forcar") == "1" or not db.busca_recente(f"{reg}:{termo}"):
+                    erros = buscar_ao_vivo(termo, regiao=reg)
+                    db.marcar_busca(f"{reg}:{termo}")
+                return self._json({"produtos": da_regiao(db.consultar(termo, limite=600, max_idade_h=24 * 7), reg), "erros": erros})
             if u.path == "/api/ofertas":
-                return self._json({"produtos": db.consultar(q.get("q", ""), q.get("mercado", ""), so_ofertas=True,
-                                                            origem=q.get("origem", ""), limite=2000)})
+                return self._json({"produtos": da_regiao(db.consultar(q.get("q", ""), q.get("mercado", ""), so_ofertas=True,
+                                                                      origem=q.get("origem", ""), limite=2000), q.get("regiao"))})
             if u.path == "/api/folhetos":
-                return self._json({"folhetos": db.listar_folhetos()})
+                return self._json({"folhetos": da_regiao(db.listar_folhetos(), q.get("regiao"))})
             if u.path == "/api/local":
                 return self._json(info_local())
             if u.path == "/api/dados":
@@ -274,7 +286,7 @@ class Handler(SimpleHTTPRequestHandler):
                     "trabalho": trabalho, "ia": ok, "ia_motivo": motivo, "contagens": db.contagens(),
                     "loja_assai_id": int(db.config("loja_assai_id") or ASSAI_LOJAS_SP.get(db.config("loja_assai", "Mooca"), 260)),
                     "lojas_assai": lojas_assai_menu(),
-                    "mercados_online": [n for n, _ in fontes()], "mercados_folheto": ["Assaí", "Roldão", "Akki", "Lopes", "Max Atacadista", "Barbosa"],
+                    "mercados_online": [n for n, _ in fontes()], "regioes": REGIOES, "mercados_folheto": ["Assaí", "Roldão", "Akki", "Lopes", "Max Atacadista", "Barbosa"],
                 })
         except Exception as e:
             return self._json({"erro": str(e)}, 500)

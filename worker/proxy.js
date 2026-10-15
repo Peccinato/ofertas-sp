@@ -8,6 +8,8 @@ const PERMITIDOS = [
   "api.tendaatacado.com.br",         // Tenda
   "www.sondadelivery.com.br",        // Sonda
   "mercado.carrefour.com.br",        // Carrefour (página de busca)
+  "www.superpaguemenos.com.br",      // Pague Menos (página de busca)
+  "www.covabra.com.br", "boa.vtexcommercestable.com.br",   // Covabra e BOA (VTEX)
   "www.atacadao.com.br", "www.samsclub.com.br", "www.mambo.com.br", "www.obahortifruti.com.br",
   "www.coopsupermercado.com.br", "www.savegnago.com.br", "www.zaffari.com.br", "www.swift.com.br",
   "www.assai.com.br",                // lojas e tabloides do Assaí

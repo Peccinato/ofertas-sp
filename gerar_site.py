@@ -27,6 +27,7 @@ os.environ.setdefault("OFERTAS_DB", os.path.join(tempfile.gettempdir(), "ofertas
 import app  # noqa: E402  (precisa do OFERTAS_DB definido antes)
 import db  # noqa: E402
 from coletores import extrator_ia, local  # noqa: E402
+from coletores.regioes import REGIOES  # noqa: E402
 from coletores.folhetos import _data_br, _ofertas_assai  # noqa: E402
 
 # a cesta do app + itens extras, para a busca online ter bastante coisa
@@ -64,10 +65,11 @@ def main():
         os.remove(db.ARQUIVO)
     db.criar()
 
-    cep = os.environ.get("OFERTAS_CEP", "").strip() or "01310100"
-    print("CEP:", cep)
-    info = app.definir_cep(cep, folhetos_em_segundo_plano=False)
-    print("  região:", info.get("endereco", {}).get("bairro"), "| Pão de Açúcar:", info.get("pao_de_acucar"))
+    # a região "sp" vem primeiro: os folhetos usam o Assaí mais perto do CEP dela
+    regioes = {rid: dict(r) for rid, r in REGIOES.items()}
+    regioes["sp"]["cep"] = os.environ.get("OFERTAS_CEP", "").strip() or regioes["sp"]["cep"]
+    print("CEP SP:", regioes["sp"]["cep"])
+    regioes["sp"]["local"] = app.definir_cep(regioes["sp"]["cep"], folhetos_em_segundo_plano=False)
 
     print("Folhetos...")
     erros = app.atualizar_folhetos()
@@ -86,11 +88,16 @@ def main():
     if os.environ.get("OFERTAS_TERMOS"):
         termos = termos[: int(os.environ["OFERTAS_TERMOS"])]
     falhas = {}
-    for i, t in enumerate(termos, 1):
-        for m, e in app.buscar_ao_vivo(t, n=40).items():
-            falhas.setdefault(m, []).append(e)
-        if i % 20 == 0 or i == len(termos):
-            print(f"  [{i}/{len(termos)}] termos coletados")
+    for rid, r in regioes.items():
+        if rid != "sp":   # cada região coleta com o próprio CEP (sem apagar o que já foi coletado)
+            r["local"] = app.definir_cep(r["cep"], folhetos_em_segundo_plano=False, limpar=False)
+        r["regiao_lojas"] = json.loads(db.config("regiao", "{}") or "{}")   # ids de região/loja de cada rede para o CEP padrão
+        print(f"Região {r['nome']} (CEP {r['cep']}):", ", ".join(r["online"]))
+        for i, t in enumerate(termos, 1):
+            for m, e in app.buscar_ao_vivo(t, n=40, regiao=rid).items():
+                falhas.setdefault(m, []).append(e)
+            if i % 40 == 0 or i == len(termos):
+                print(f"  [{i}/{len(termos)}] termos coletados")
     for m, es in falhas.items():
         print(f"  ! {m}: {len(es)} falhas, ex.: {es[0]}")
 
@@ -133,9 +140,9 @@ def main():
     gravar("assai.json", assai)
     gravar("folhetos-lidos.json", lidos)
     gravar("meta.json", {
-        "gerado_em": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "local": app.info_local(),
+        "gerado_em": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "local": regioes["sp"]["local"], "regioes": regioes,
         "mercados_online": [n for n, _ in app.fontes()],
-        "mercados_folheto": ["Assaí", "Roldão", "Akki", "Lopes", "Max Atacadista", "Barbosa"],
+        "mercados_folheto": sorted({m for r in regioes.values() for m in r["folhetos"]}),
         "termos": len(termos), "falhas": {m: len(e) for m, e in falhas.items()},
         "proxy": os.environ.get("OFERTAS_PROXY", ""), "assai_lojas": assai_lojas,
     })

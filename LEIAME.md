@@ -71,6 +71,34 @@ O app fica visível só dentro da sua rede de casa, não na internet.
 - **Cercadão:** a página de jornal de ofertas está vazia no momento.
 - **Dia, St Marche, Nagumo e Hirota:** não encontrei uma fonte pública de preços.
 
+## Regiões
+
+No topo do app há um seletor de região. Cada região tem suas redes e seu CEP padrão, e guarda o próprio CEP quando você digita outro:
+
+| Região | Lojas online (busca ao vivo) | Folhetos |
+|---|---|---|
+| **SP - São Paulo** | Pão de Açúcar, Extra, Carrefour, Tenda, Sonda, Atacadão, Sam's Club, Mambo, Oba, Coop, Savegnago, Zaffari, Swift | Assaí, Roldão, Akki, Lopes, Max Atacadista, Barbosa |
+| **SP - Paulínia** | Pague Menos, BOA, Covabra | Assaí (loja Paulínia) |
+
+O **Poupe Real** ficou de fora: o site não publica ofertas (elas saem só no app "Clube Poupeiros" e no Instagram).
+
+### Como adicionar uma região
+
+1. Abra `coletores/regioes.py` e copie um dos blocos, por exemplo:
+   ```python
+   "campinas": {
+       "nome": "SP - Campinas",
+       "cep": "13010000",            # um CEP real da cidade (só números)
+       "online": ["Atacadão", "Covabra", "Pague Menos"],
+       "folhetos": ["Assaí"],
+   },
+   ```
+2. Use nos campos `online` e `folhetos` os nomes das redes que o app já conhece (os mesmos que aparecem no site). O Assaí escolhe sozinho a loja mais perto do CEP.
+3. Se a rede for **nova**:
+   - **Loja VTEX** (a maioria das redes grandes): acrescente uma linha no dicionário `VTEX` em `coletores/sites.py` e em `VTEX_LOJAS` no `static/index.html`, e libere o domínio em `worker/proxy.js`.
+   - **Outra plataforma**: precisa de um coletor novo, em Python (`coletores/sites.py` ou `coletores/folhetos.py`) e, para a busca ao vivo, em JavaScript (`AoVivo` no `static/index.html`).
+4. Envie para o GitHub. A próxima coleta já inclui a região, e o botão aparece sozinho no site.
+
 ## CEP
 
 Clique em **📍** no topo e informe seu CEP. Com ele:
