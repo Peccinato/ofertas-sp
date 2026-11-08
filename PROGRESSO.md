@@ -1,6 +1,6 @@
 # Estado da sessão — Ofertas SP
 
-Última atualização: 2026-11-08 19:40 (America/Sao_Paulo)
+Última atualização: 2026-11-08 20:45 (America/Sao_Paulo)
 
 Este arquivo existe para a sessão poder ser compactada sem perder o fio. Se você (ou outra
 sessão) retomar este trabalho, leia isto primeiro e continue daqui.
@@ -12,10 +12,30 @@ sessão) retomar este trabalho, leia isto primeiro e continue daqui.
 O usuário listou 7 ideias para o Ofertas SP e pediu: fazer o que eu achasse melhor, incluir
 histórico de preço, propor ideias novas, e no fim poder **hospedar o programa num Linux Debian**.
 
-## Situação agora: as pendências foram fechadas
+## Situação agora: publicado
 
-Tudo o que estava na lista de "falta fazer" foi feito e verificado. O que resta é decisão do
-usuário (publicar ou não) e o tempo de coleta acumular.
+Commit `b87d147` no `main`, enviado ao GitHub. Workflow "Publicar site" disparado à mão
+(run `42536668861`). Antes disso foi feito backup em `backups/antes-publicar-2026-11-08-1641/`
+(33 arquivos, 30,3 MB, os dois bancos com `integrity_check` = ok).
+
+## Decisão do dono: Telegram desligado
+
+O envio pelo Telegram está **desligado por padrão** (`ALERTAS_TELEGRAM=0`). A função continua
+inteira no código e documentada no LEIAME, seção "Alertas de preço". O que mudou:
+
+- `alertas.TELEGRAM_LIGADO` é a chave. Sem ela em `1`, `enviar_telegram` recusa antes de qualquer rede.
+- `checar_alertas` continua rodando: atualiza preços, confere alvos e devolve `bateram` (o que teria
+  sido avisado) além de `disparos`.
+- Na tela, o painel mostra "Telegram desligado" com a instrução de como religar, o botão "Testar
+  Telegram" fica oculto, e "Conferir agora" lista quem bateu o alvo.
+
+## Correção importante antes de publicar
+
+O GitHub Actions roda em máquina limpa, **sem `historico.db`**. Do jeito que estava, o
+`historico.json` publicado sairia vazio todo dia e o histórico nunca acumularia — o gráfico nunca
+passaria de um ponto. Agora `exportar_historico(anteriores=...)` lê o `historico.json` do site
+publicado (mesmo padrão que o `folhetos-lidos.json` já usava) e mescla: o dia novo manda, o passado
+é preservado. O site publicado é o arquivo de longo prazo. Tem teste cobrindo os três casos.
 
 ---
 
