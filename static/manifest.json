@@ -1,0 +1,22 @@
+{
+  "name": "Ofertas SP - preços dos mercados",
+  "short_name": "Ofertas SP",
+  "description": "Compara preços dos mercados de São Paulo, guarda o histórico e avisa quando o preço cai.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f6f5f2",
+  "theme_color": "#0f7b4f",
+  "lang": "pt-BR",
+  "categories": ["shopping", "food", "utilities"],
+  "icons": [
+    { "src": "icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Minha lista", "url": "./#lista", "description": "Abrir a lista de compras" },
+    { "name": "Favoritos", "url": "./#favoritos", "description": "Preços dos favoritos" }
+  ]
+}

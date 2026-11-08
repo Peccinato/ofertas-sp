@@ -139,6 +139,11 @@ def main():
     gravar("folhetos.json", [f for f in db.listar_folhetos() if f["mercado"] != "Assaí"])
     gravar("assai.json", assai)
     gravar("folhetos-lidos.json", lidos)
+    # histórico: só o necessário para o gráfico e o veredito, sem inflar o site.
+    # o publicado é lido de volta porque o Actions roda sem banco de histórico.
+    hist_url = (os.environ.get("SITE_URL") or "").rstrip("/") + "/dados/historico.json"
+    hist_anterior = (baixar_json(hist_url) if os.environ.get("SITE_URL") else None) or {}
+    gravar("historico.json", exportar_historico(anteriores=hist_anterior))
     gravar("meta.json", {
         "gerado_em": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "local": regioes["sp"]["local"], "regioes": regioes,
         "mercados_online": [n for n, _ in app.fontes()],
@@ -146,10 +151,71 @@ def main():
         "termos": len(termos), "falhas": {m: len(e) for m, e in falhas.items()},
         "proxy": os.environ.get("OFERTAS_PROXY", ""), "assai_lojas": assai_lojas,
     })
-    shutil.copy(os.path.join(PASTA, "static", "index.html"), os.path.join(SAIDA, "index.html"))
+    # o site publicado também é um PWA: leva manifest, service worker e ícones
+    for nome in ("index.html", "manifest.json", "sw.js", "icone-192.png", "icone-512.png"):
+        origem = os.path.join(PASTA, "static", nome)
+        if os.path.exists(origem):
+            shutil.copy(origem, os.path.join(SAIDA, nome))
     print(f"Pronto: {len(produtos)} preços em {SAIDA} ({time.time() - inicio:.0f}s)")
     if not produtos:
         sys.exit("Nenhum preço coletado; não publicar.")
+
+
+def exportar_historico(dias=120, max_produtos=6000, anteriores=None):
+    """Histórico enxuto para o site estático.
+
+    Formato compacto de propósito: {chave: [[dia_epoch, preco], ...]}. O site publicado já carrega
+    11 MB de catálogo; o histórico não pode dobrar isso. Só entram os produtos que ainda estão no
+    catálogo e que têm pelo menos 2 dias observados, porque um ponto só não desenha nada.
+
+    `anteriores` é o historico.json do site publicado. O GitHub Actions roda em máquina limpa, sem
+    banco de histórico: sem isso, cada execução recomeçaria do zero e o gráfico nunca passaria de um
+    dia. O site publicado é, ele mesmo, o arquivo de longo prazo.
+    """
+    import historico as hist
+    try:
+        hist.criar()
+    except Exception as e:   # noqa: BLE001
+        print("  ! histórico indisponível:", e)
+        return anteriores or {}
+    desde = time.strftime("%Y-%m-%d", time.localtime(time.time() - dias * 86400))
+    out, n = {}, 0
+    try:
+        with hist.conectar() as con:
+            rows = con.execute("""
+                SELECT mercado, nome, dia, MIN(preco) preco FROM precos
+                WHERE dia >= ? GROUP BY mercado, nome, dia ORDER BY mercado, nome, dia
+            """, (desde,)).fetchall()
+    except Exception as e:   # noqa: BLE001
+        print("  ! histórico ilegível:", e)
+        return anteriores or {}
+    for r in rows:
+        k = f"{r['mercado']}|{r['nome']}"
+        if k not in out and n >= max_produtos:
+            continue
+        if k not in out:
+            n += 1
+        try:
+            ep = int(time.mktime(time.strptime(r["dia"], "%Y-%m-%d")))
+        except ValueError:
+            continue
+        out.setdefault(k, []).append([ep, round(r["preco"], 2)])
+
+    # mescla com o que já estava publicado: o dia novo manda, o passado é preservado
+    herdados = 0
+    for k, serie in (anteriores or {}).items():
+        if k in out:
+            continue
+        if n >= max_produtos:
+            break
+        if isinstance(serie, list) and len(serie) >= 2:
+            out[k] = serie
+            n += 1
+            herdados += 1
+    if herdados:
+        print(f"Histórico: {herdados} produtos herdados do site publicado")
+    print(f"Histórico exportado: {len(out)} produtos, {sum(len(v) for v in out.values())} pontos")
+    return out
 
 
 def intercalar_por_mercado(folhetos):

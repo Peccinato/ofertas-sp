@@ -1,0 +1,29 @@
+services:
+  ofertas:
+    build: .
+    image: ofertas-sp:latest
+    container_name: ofertas-sp
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8765:8765"     # só o nginx da máquina alcança; troque para 0.0.0.0:8765 se não houver proxy
+    volumes:
+      - ofertas-dados:/dados
+    environment:
+      TZ: America/Sao_Paulo
+      OFERTAS_CEP: "01310-100"
+      OFERTAS_HORA: "6"
+      OFERTAS_MINUTO: "0"
+      # OFERTAS_PROXY: "https://ofertas-sp-proxy.SEU-SUBDOMINIO.workers.dev"
+      # TELEGRAM_TOKEN: "123456:ABC..."
+      # TELEGRAM_CHAT: "123456789"
+      # GEMINI_API_KEY: "..."
+      # OFERTAS_FAMILIA: "K7M2QX9PBR4T"
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8765/api/saude', timeout=8).status==200 else 1)"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  ofertas-dados:

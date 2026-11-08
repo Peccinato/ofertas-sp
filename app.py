@@ -7,6 +7,7 @@ Uso:
 """
 import json
 import os
+import secrets
 import socket
 import sys
 import threading
@@ -16,7 +17,9 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
+import alertas
 import db
+import historico
 from coletores import extrator_ia, local
 from coletores.base import Produto
 from coletores.folhetos import ASSAI_LOJAS_SP, todos_folhetos
@@ -236,6 +239,66 @@ def ler_folhetos(imagens):
     return _rodar("Lendo folhetos com IA", len(imagens), f)
 
 
+# ---------------------------------------------------------------- histórico e promoção falsa
+
+def historico_produto(mercado, nome, dias=90):
+    """Série + veredito do desconto de um produto específico."""
+    av = historico.avaliar_oferta(mercado, nome, _preco_atual(mercado, nome) or 0, dias=dias)
+    av["melhor_dia"] = historico.melhor_dia(mercado, nome)
+    av["mercado"] = mercado
+    av["nome"] = nome
+    return av
+
+
+def _preco_atual(mercado, nome):
+    p = db.produtos_por_chave([[mercado, nome]]).get(f"{mercado}|{nome}")
+    return p["preco"] if p else None
+
+
+def ofertas_reais(limite=40, dias=90):
+    """Só as ofertas que sobrevivem ao histórico: desconto de verdade, não teatro de preço."""
+    out = []
+    for p in db.consultar(so_ofertas=True, limite=1200):
+        av = historico.avaliar_oferta(p["mercado"], p["nome"], p["preco"], p.get("preco_de"), dias=dias)
+        if av.get("veredito") in ("boa", "inflada"):
+            out.append({**p, "historico": {k: v for k, v in av.items() if k != "serie"}})
+    out.sort(key=lambda x: -(x["historico"].get("desconto_real_pct") or 0))
+    return out[:limite]
+
+
+def saude(familia=""):
+    """Estado do serviço, para o painel e para o monitoramento externo.
+
+    A pergunta que importa não é "o servidor está de pé", é "a coleta de hoje rodou".
+    Um app que serve preço de três dias atrás como se fosse de hoje é pior que um app fora do ar.
+    """
+    h = historico.contagens()
+    ultima = db.ultima_execucao_ok("coleta")
+    horas = round((time.time() - ultima) / 3600, 1) if ultima else None
+    # com família informada, conta só os alertas dela: é o número que aparece ao lado da lista
+    if familia:
+        alertas_ativos = len([a for a in db.alertas_listar(familia) if a.get("ativo")])
+    else:
+        alertas_ativos = len(db.alertas_ativos())
+    avisos = []
+    if horas is None:
+        avisos.append("nenhuma coleta registrada ainda")
+    elif horas > 36:
+        avisos.append(f"a última coleta bem-sucedida foi há {horas:.0f} horas")
+    if h.get("d") == 0:
+        avisos.append("histórico de preços vazio")
+    return {
+        "ok": not avisos,
+        "avisos": avisos,
+        "ultima_coleta_horas": horas,
+        "historico": h,
+        "alertas_ativos": alertas_ativos,
+        "telegram": alertas.telegram_configurado(),
+        "produtos": sum(c["n"] for c in db.contagens()),
+        "execucoes": db.execucoes_recentes(10),
+    }
+
+
 # ---------------------------------------------------------------- servidor
 
 class Handler(SimpleHTTPRequestHandler):
@@ -256,6 +319,28 @@ class Handler(SimpleHTTPRequestHandler):
     def _corpo(self):
         n = int(self.headers.get("Content-Length") or 0)
         return json.loads(self.rfile.read(n) or b"{}") if n else {}
+
+    def _familia_gravar(self, corpo):
+        """Cria ou atualiza a lista compartilhada.
+
+        O código é a única credencial, então ele precisa ser longo o bastante para não ser
+        adivinhado: 12 caracteres de um alfabeto sem letras ambíguas (0/O, 1/I/L) dá ~10^18
+        combinações. Quem tem o código entra; não existe "revogar acesso" sem trocar o código.
+        """
+        codigo = (corpo.get("codigo") or "").strip().upper()
+        dados = corpo.get("dados")
+        if dados is None:
+            return {"erro": "nada para gravar"}, 400
+        if not codigo:
+            codigo = _novo_codigo()
+        elif len(codigo) < 8:
+            return {"erro": "código curto demais"}, 400
+        r = db.familia_gravar(codigo, dados, corpo.get("versao"))
+        if r["conflito"]:
+            atual = db.familia_ler(codigo) or {}
+            return {"conflito": True, "versao": r["versao"], "dados": atual.get("dados"),
+                    "codigo": codigo}
+        return {"codigo": codigo, "versao": r["versao"], "conflito": False}
 
     def do_GET(self):
         u = urlparse(self.path)
@@ -287,7 +372,32 @@ class Handler(SimpleHTTPRequestHandler):
                     "loja_assai_id": int(db.config("loja_assai_id") or ASSAI_LOJAS_SP.get(db.config("loja_assai", "Mooca"), 260)),
                     "lojas_assai": lojas_assai_menu(),
                     "mercados_online": [n for n, _ in fontes()], "regioes": REGIOES, "mercados_folheto": ["Assaí", "Roldão", "Akki", "Lopes", "Max Atacadista", "Barbosa"],
+                    "historico": historico.contagens(), "telegram": alertas.telegram_configurado(),
                 })
+            if u.path == "/api/saude":
+                return self._json(saude(q.get("familia", "")))
+            if u.path == "/api/historico":
+                return self._json(historico_produto(q.get("mercado", ""), q.get("nome", ""),
+                                                    int(q.get("dias") or 90)))
+            if u.path == "/api/historico/ean":
+                return self._json({"ean": q.get("ean", ""), "precos": db.por_ean(q.get("ean", "")),
+                                   "serie": historico.serie_ean(q.get("ean", ""), int(q.get("dias") or 90))})
+            if u.path == "/api/ofertas/reais":
+                return self._json({"produtos": ofertas_reais(int(q.get("limite") or 40))})
+            if u.path == "/api/quedas":
+                return self._json({"quedas": historico.quedas_bruscas(pct=float(q.get("pct") or 40))})
+            if u.path == "/api/cesta":
+                chaves = [c.split("|", 1) for c in (q.get("itens") or "").split(";") if "|" in c]
+                return self._json(historico.indice_cesta(chaves, int(q.get("dias") or 90)))
+            if u.path == "/api/familia":
+                codigo = q.get("codigo", "").strip().upper()
+                fam = db.familia_ler(codigo) if codigo else None
+                if not fam:
+                    return self._json({"erro": "código não encontrado"}, 404)
+                return self._json(fam)
+            if u.path == "/api/alertas":
+                return self._json({"alertas": db.alertas_listar(q.get("familia", "").strip().upper()),
+                                   "telegram": alertas.telegram_configurado()})
         except Exception as e:
             return self._json({"erro": str(e)}, 500)
         if u.path == "/":
@@ -326,9 +436,46 @@ class Handler(SimpleHTTPRequestHandler):
                     return self._json({"erro": motivo}, 400)
                 imgs = corpo.get("imagens") or [f["imagem"] for f in db.listar_folhetos() if f["status"] != "lido"]
                 return self._json({"iniciado": ler_folhetos(imgs), "total": len(imgs)})
+            if u.path == "/api/familia":
+                return self._json(self._familia_gravar(corpo))
+            if u.path == "/api/alertas":
+                familia = (corpo.get("familia") or "").strip().upper()
+                if not familia:
+                    return self._json({"erro": "informe o código da família"}, 400)
+                if corpo.get("apagar"):
+                    db.alerta_apagar(int(corpo["apagar"]))
+                elif corpo.get("id"):
+                    db.alerta_atualizar(int(corpo["id"]), **{k: v for k, v in corpo.items() if k != "id"})
+                else:
+                    if not corpo.get("nome") or not corpo.get("alvo"):
+                        return self._json({"erro": "informe o produto e o preço-alvo"}, 400)
+                    db.alerta_criar(familia, corpo["nome"], corpo["alvo"], corpo.get("mercado", ""),
+                                    corpo.get("termo", ""), corpo.get("telegram_chat", ""))
+                return self._json({"alertas": db.alertas_listar(familia),
+                                   "telegram": alertas.telegram_configurado()})
+            if u.path == "/api/alertas/checar":
+                return self._json(alertas.checar_alertas())
+            if u.path == "/api/alertas/teste":
+                ok, det = alertas.enviar_telegram("✅ Ofertas SP: o Telegram está ligado. "
+                                                      "Os avisos de preço vão chegar aqui.")
+                return self._json({"ok": ok, "detalhe": det})
+            if u.path == "/api/resumo-semanal":
+                texto = alertas.texto_resumo_semanal((corpo.get("familia") or "").strip().upper())
+                if texto is None:
+                    return self._json({"erro": "família sem lista para resumir"}, 400)
+                if corpo.get("enviar"):
+                    ok, det = alertas.enviar_telegram(texto)
+                    return self._json({"ok": ok, "detalhe": det, "texto": texto})
+                return self._json({"texto": texto})
         except Exception as e:
             return self._json({"erro": str(e)}, 500)
         self._json({"erro": "rota desconhecida"}, 404)
+
+
+def _novo_codigo(n=12):
+    """Código de convite da família: sem 0/O/1/I/L, para ninguém errar ao digitar."""
+    alfabeto = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+    return "".join(secrets.choice(alfabeto) for _ in range(n))
 
 
 def ip_local():

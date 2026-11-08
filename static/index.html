@@ -2,7 +2,13 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0f7b4f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Ofertas SP">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icone-192.png">
 <title>Ofertas SP</title>
 <style>
   :root {
@@ -91,6 +97,33 @@
   .fav-alt { font-size: 12.5px; margin-top: 4px; color: var(--acento); }
   .fav-alt.pior { color: var(--sub); }
   .var-up { color: var(--verm); font-size: 12px; } .var-down { color: var(--acento); font-size: 12px; }
+  /* histórico de preços e veredito da promoção */
+  .tag.real { background: var(--acento-2); color: var(--acento); }
+  .tag.falsa { background: var(--verm-2); color: var(--verm); }
+  .tag.cara { background: #fff3cd; color: #8a6100; }
+  @media (prefers-color-scheme: dark) { .tag.cara { background: #3a2f10; color: #e8c26a; } }
+  .hist { margin-top: 6px; }
+  .hist svg { display: block; width: 100%; height: 64px; }
+  .hist .eixo { display: flex; justify-content: space-between; font-size: 11px; color: var(--sub); }
+  .hist .nums { font-size: 12px; color: var(--sub); margin-top: 2px; }
+  /* família e alertas */
+  .codigo-familia { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 19px; letter-spacing: .12em;
+                    font-weight: 700; background: var(--acento-2); color: var(--acento); padding: 8px 12px;
+                    border-radius: 10px; display: inline-block; user-select: all; }
+  .linha-alerta { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center;
+                  background: var(--card); border: 1px solid var(--linha); border-radius: var(--raio); padding: 10px 12px; }
+  .linha-alerta .alvo { font-weight: 700; }
+  .linha-alerta.off { opacity: .5; }
+  .saude { display: grid; gap: 6px; font-size: 13px; }
+  .saude .ok { color: var(--acento); } .saude .ruim { color: var(--verm); }
+  /* modo mercado: letras grandes, para usar andando */
+  body.modo-mercado .linha-lista { padding: 16px 14px; }
+  body.modo-mercado .linha-lista .txt { font-size: 21px; font-weight: 700; }
+  body.modo-mercado .linha-lista input[type=checkbox] { width: 30px; height: 30px; }
+  body.modo-mercado .linha-lista .onde, body.modo-mercado .linha-lista .valor { display: none; }
+  body.modo-mercado header, body.modo-mercado #formLista, body.modo-mercado .barra-lista { display: none; }
+  .corredor { font-size: 13px; font-weight: 700; color: var(--sub); text-transform: uppercase;
+              letter-spacing: .08em; margin: 16px 0 4px; }
   /* lista de compras */
   .linha-lista { display: grid; grid-template-columns: auto 64px 1fr auto auto; gap: 10px; align-items: center; background: var(--card);
                  border: 1px solid var(--linha); border-radius: var(--raio); padding: 10px 12px; }
@@ -125,6 +158,7 @@
     <button data-aba="ofertas">Ofertas</button>
     <button data-aba="favoritos">★ Favoritos <span id="nFav"></span></button>
     <button data-aba="lista">🛒 Lista <span id="nLista"></span></button>
+    <button data-aba="familia">👨‍👩‍👧 Família</button>
     <button data-aba="folhetos">Folhetos</button>
   </nav>
 </header>
@@ -181,6 +215,8 @@
     <div class="barra">
       <button class="btn sec" id="btnCalcLista" type="button">Recalcular preços</button>
       <button class="btn sec" id="btnLimparFeitos" type="button">Remover itens marcados</button>
+      <button class="btn sec" id="btnModoMercado" type="button">Modo mercado</button>
+      <button class="btn sec" id="btnWhatsapp" type="button">Mandar no WhatsApp</button>
     </div>
     <div class="info" id="infoLista"></div>
     <div class="lista" id="itensLista"></div>
@@ -202,6 +238,39 @@
     <div class="info" id="infoFol"></div>
     <div class="chips" id="filtroFol"></div>
     <div id="gradeFol"></div>
+  </section>
+
+  <!-- FAMÍLIA -->
+  <section class="painel" id="familia">
+    <h2>Lista compartilhada</h2>
+    <div class="info" id="infoFamilia">Entre com o código da família para todo mundo ver e editar a mesma lista e os mesmos favoritos.</div>
+    <div class="barra">
+      <input type="search" id="codigoFamilia" placeholder="Código da família (ex.: K7M2QX9PBR4T)" autocomplete="off" spellcheck="false" style="text-transform:uppercase;letter-spacing:.08em">
+      <button class="btn" id="btnEntrarFamilia" type="button">Entrar</button>
+      <button class="btn sec" id="btnCriarFamilia" type="button">Criar nova</button>
+      <button class="btn sec" id="btnSairFamilia" type="button" hidden>Sair</button>
+    </div>
+    <div id="estadoFamilia"></div>
+
+    <h2>Alertas de preço</h2>
+    <div class="info">Defina o preço que você considera bom. Todo dia, depois da coleta, o app confere os alvos e mostra aqui o que bateu.</div>
+    <div id="estadoTelegram"></div>
+    <form class="barra" id="formAlerta">
+      <input type="search" id="alertaProduto" placeholder="Produto (ex.: café pilão 500g)" required>
+      <input type="number" id="alertaAlvo" placeholder="Alvo R$" step="0.01" min="0.01" required style="width:120px;font:inherit;padding:10px;border:1px solid var(--linha);border-radius:10px;background:var(--card);color:var(--txt)">
+      <button class="btn" type="submit">Criar alerta</button>
+    </form>
+    <div class="barra">
+      <button class="btn sec" id="btnTesteTelegram" type="button" hidden>Testar Telegram</button>
+      <button class="btn sec" id="btnChecarAlertas" type="button">Conferir agora</button>
+      <button class="btn sec" id="btnResumoSemana" type="button">Ver resumo da semana</button>
+    </div>
+    <div id="avisoAlertas"></div>
+    <div class="lista" id="listaAlertas"></div>
+
+    <h2>Saúde do serviço</h2>
+    <div class="info">A pergunta que importa não é se o site está no ar, é se a coleta de hoje rodou.</div>
+    <div class="saude" id="saude"></div>
   </section>
 </main>
 
@@ -244,7 +313,7 @@ const Regiao = {
 };
 
 const Estatico = {
-  ativo: false, produtos: [], folhetos: [], assai: [], lidos: {}, meta: {},
+  ativo: false, produtos: [], folhetos: [], assai: [], lidos: {}, meta: {}, historico: {},
   async iniciar() {
     try {
       const r = await fetch("dados/meta.json", {cache: "no-cache"});
@@ -253,9 +322,11 @@ const Estatico = {
     } catch { return; }
     this.ativo = true;
     const json = (n, padrao) => fetch("dados/" + n, {cache: "no-cache"}).then(r => r.json()).catch(() => padrao);
-    const [prods, fols, assai, lidos] = await Promise.all([
-      json("produtos.json", {colunas: [], linhas: []}), json("folhetos.json", []), json("assai.json", []), json("folhetos-lidos.json", {}),
+    const [prods, fols, assai, lidos, hist] = await Promise.all([
+      json("produtos.json", {colunas: [], linhas: []}), json("folhetos.json", []), json("assai.json", []),
+      json("folhetos-lidos.json", {}), json("historico.json", {}),
     ]);
+    this.historico = hist || {};
     const cols = prods.colunas;
     this.produtos = prods.linhas.map(l => preparar(Object.fromEntries(cols.map((c, i) => [c, l[i]]))))
       .filter(p => p.origem !== "folheto");   // itens de folheto vêm de `lidos`, conforme a região do usuário
@@ -318,6 +389,29 @@ const Estatico = {
         }
         return AoVivo.ativo && AoVivo.local ? AoVivo.info() : (Regiao.def().local || this.meta.local || {endereco: null});
       case "dados": throw new Error("sem servidor");   // favoritos e lista ficam só no aparelho
+      case "historico": {
+        // no site publicado não há servidor: o veredito sai do historico.json gerado na coleta
+        const serie = this.historico[q.mercado + "|" + q.nome];
+        if (!serie || serie.length < 2) return {veredito: "sem_historico", dias: serie ? serie.length : 0};
+        const p = this.porChave(q.mercado + "|" + q.nome) || this.todos().find(x => x.mercado === q.mercado && x.nome === q.nome);
+        const av = avaliarLocal(serie, p ? p.preco : serie[serie.length - 1][1], p ? p.preco_de : null);
+        av.serie = serie.map(([ep, preco]) => ({dia: new Date(ep * 1000).toISOString().slice(0, 10), preco}));
+        av.mercado = q.mercado; av.nome = q.nome;
+        return av;
+      }
+      case "saude": {
+        // no estático a "coleta" é a geração do site: a data vem do meta.json
+        const dias = Object.keys(this.historico).length;
+        const gerado = this.meta.gerado_em ? new Date(this.meta.gerado_em) : null;
+        const horas = gerado ? Math.round((Date.now() - gerado) / 36e5) : null;
+        return {ok: horas != null && horas < 36, avisos: horas == null ? ["sem data de coleta"] : (horas >= 36 ? [`a coleta foi há ${horas} horas`] : []),
+          ultima_coleta_horas: horas, historico: {n: dias, d: 0, p: dias, ini: null, fim: null},
+          alertas_ativos: 0, telegram: false, produtos: this.todos().length, execucoes: [], estatico: true};
+      }
+      case "familia":
+        return {erro: "A lista compartilhada precisa do app com servidor. No site publicado, favoritos e lista ficam no aparelho."};
+      case "alertas":
+        return {alertas: [], erro: "Os alertas de preço precisam do app com servidor (é ele que fala com o Telegram)."};
       case "favoritos/precos": {
         const out = {};
         for (const f of corpo.favoritos || []) {
@@ -587,10 +681,15 @@ const Dados = {
     this.d.favoritos ||= []; this.d.lista ||= [];
     contadores();
   },
-  salvar() {
+  salvarLocal() {
     try { localStorage.setItem("ofertas-dados", JSON.stringify(this.d)); } catch {}
+  },
+  salvar() {
+    this.salvarLocal();
     clearTimeout(this._t);
     this._t = setTimeout(() => apiFetch("/api/dados", {method: "POST", body: JSON.stringify(this.d)}).catch(() => {}), 300);
+    // com família ligada, a mesma alteração vai para a lista compartilhada
+    if (Familia.codigo) Familia.enviar();
     contadores();
   },
   ehFav(k) { return this.d.favoritos.some(f => f.k === k); },
@@ -642,6 +741,7 @@ document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
   if (b.dataset.aba === "folhetos") carregarFolhetos();
   if (b.dataset.aba === "favoritos") carregarFavoritos();
   if (b.dataset.aba === "lista") desenharLista(), calcularLista();
+  if (b.dataset.aba === "familia") { desenharFamilia(); Familia.sincronizar(); }
 });
 
 function acoesHTML(p) {
@@ -664,9 +764,9 @@ function itemHTML(p, destaque, extraHTML = "") {
     p.validade ? `<span>${esc(p.validade)}</span>` : "",
   ].join("");
   const img = p.origem === "folheto" ? "" : esc(p.imagem);
-  return `<div class="item${destaque ? " top" : ""}">
+  return `<div class="item${destaque ? " top" : ""}" data-k="${esc(chave(p))}">
     ${img ? `<img loading="lazy" src="${img}" alt="">` : `<img alt="" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'/>">`}
-    <div><div class="nome"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.nome)}</a></div><div class="meta">${tags}</div>${extraHTML}</div>
+    <div class="corpo-item"><div class="nome"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.nome)}</a></div><div class="meta">${tags}</div>${extraHTML}</div>
     <div class="preco">${de}<b>${brl(p.preco)}</b>${unid}</div>${acoesHTML(p)}</div>`;
 }
 
@@ -705,6 +805,7 @@ function desenharBusca() {
     : "Nada encontrado. Tente um termo mais simples (ex.: “arroz” em vez de “arroz tipo 1 5kg camil”).";
   const ref = $("#refazer"); if (ref) ref.onclick = e => { e.preventDefault(); buscar(true); };
   $("#resultado").innerHTML = lista.slice(0, 300).map((p, i) => itemHTML(p, i === 0)).join("");
+  enriquecerHistorico("#resultado");
 }
 $("#filtroMercados").onclick = e => {
   const c = e.target.closest(".chip"); if (!c) return;
@@ -726,6 +827,7 @@ function desenharOfertas() {
     ? `${lista.length} ofertas (produtos com desconto, promoção ou vindos de folheto).`
     : "Nenhuma oferta salva ainda. Clique em “Atualizar ofertas” para varrer uma cesta de ~40 itens em todas as redes (leva 1–3 min).";
   $("#listaOf").innerHTML = lista.slice(0, 400).map(p => itemHTML(p)).join("");
+  enriquecerHistorico("#listaOf");
 }
 ["#mercadoOf", "#origemOf"].forEach(s => $(s).onchange = carregarOfertas);
 $("#ordemOf").onchange = desenharOfertas; $("#qOf").oninput = desenharOfertas;
@@ -821,6 +923,7 @@ async function carregarFavoritos() {
     }
     return itemHTML(p, false, extra);
   }).join("");
+  enriquecerHistorico("#listaFav");
 }
 $("#ordemFav").onchange = carregarFavoritos;
 $("#btnAtualFav").onclick = async () => {
@@ -828,6 +931,313 @@ $("#btnAtualFav").onclick = async () => {
   if (!termos.length) return;
   await apiFetch("/api/favoritos/atualizar", {method: "POST", body: JSON.stringify({termos})}); acompanhar();
 };
+
+// ---------- histórico de preços: gráfico e veredito da promoção
+const HIST = {cache: new Map()};
+
+// Mesma lógica de historico.avaliar_oferta no Python, para o site estático (GitHub Pages)
+// dar o mesmo veredito sem servidor. Se mudar a regra lá, mude aqui.
+const MIN_DIAS_JULGAR = 14;
+function medianaDe(v) {
+  if (!v.length) return 0;
+  const s = [...v].sort((a, b) => a - b), m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+function avaliarLocal(serie, preco, precoDe) {
+  const precos = serie.map(p => p[1]);
+  if (precos.length < MIN_DIAS_JULGAR) return {veredito: "sem_historico", dias: precos.length};
+  const mediana = medianaDe(precos), minimo = Math.min(...precos), maximo = Math.max(...precos);
+  const descontoReal = mediana ? Math.round(1000 * (1 - preco / mediana)) / 10 : 0;
+  const out = {dias: precos.length, mediana, minimo, maximo, desconto_real_pct: descontoReal};
+  if (precoDe && precoDe > mediana * 1.05) {
+    return {...out, veredito: "inflada",
+      motivo: `o preço "de" (${reais(precoDe)}) está acima do que este produto costuma custar (${reais(mediana)} em ${precos.length} dias)`};
+  }
+  if (descontoReal >= 15) {
+    let motivo = `${Math.round(descontoReal)}% abaixo da mediana de ${precos.length} dias (${reais(mediana)})`;
+    if (preco <= minimo * 1.02) motivo += " — é o menor preço já registrado";
+    return {...out, veredito: "boa", motivo};
+  }
+  if (descontoReal <= -10) {
+    return {...out, veredito: "cara", motivo: `${Math.abs(Math.round(descontoReal))}% acima da mediana de ${precos.length} dias (${reais(mediana)})`};
+  }
+  return {...out, veredito: "normal", motivo: `na faixa de sempre (${reais(mediana)} de mediana em ${precos.length} dias)`};
+}
+
+async function historicoDe(mercado, nome) {
+  const k = mercado + "|" + nome;
+  if (HIST.cache.has(k)) return HIST.cache.get(k);
+  let r = null;
+  try { r = await apiFetch(`/api/historico?mercado=${encodeURIComponent(mercado)}&nome=${encodeURIComponent(nome)}`).then(x => x.json()); } catch {}
+  HIST.cache.set(k, r);
+  return r;
+}
+
+// desenha a série como uma linha com faixa da mediana, sem biblioteca de gráfico
+function svgHistorico(serie, mediana) {
+  if (!serie || serie.length < 2) return "";
+  const L = 100, A = 32, pad = 2;
+  const precos = serie.map(p => p.preco);
+  const min = Math.min(...precos), max = Math.max(...precos);
+  const faixa = (max - min) || 1;
+  const x = i => pad + (L - 2 * pad) * i / (serie.length - 1);
+  const y = v => A - pad - (A - 2 * pad) * (v - min) / faixa;
+  const pontos = serie.map((p, i) => `${x(i).toFixed(2)},${y(p.preco).toFixed(2)}`).join(" ");
+  const area = `${pad},${A - pad} ${pontos} ${(L - pad).toFixed(2)},${A - pad}`;
+  const linhaMediana = mediana ? `<line x1="${pad}" y1="${y(mediana).toFixed(2)}" x2="${L - pad}" y2="${y(mediana).toFixed(2)}"
+      stroke="var(--sub)" stroke-width="0.6" stroke-dasharray="2 2"/>` : "";
+  const ultimo = serie[serie.length - 1];
+  return `<div class="hist"><svg viewBox="0 0 ${L} ${A}" preserveAspectRatio="none" role="img"
+      aria-label="Histórico de preços: de ${reais(min)} a ${reais(max)}">
+      ${linhaMediana}
+      <polygon points="${area}" fill="var(--acento-2)" opacity=".55"/>
+      <polyline points="${pontos}" fill="none" stroke="var(--acento)" stroke-width="1.1" vector-effect="non-scaling-stroke"/>
+      <circle cx="${x(serie.length - 1).toFixed(2)}" cy="${y(ultimo.preco).toFixed(2)}" r="1.6" fill="var(--acento)"/>
+    </svg>
+    <div class="eixo"><span>${serie[0].dia.split("-").reverse().slice(0, 2).join("/")}</span>
+      <span>${ultimo.dia.split("-").reverse().slice(0, 2).join("/")}</span></div></div>`;
+}
+
+function seloHistorico(h) {
+  if (!h || !h.veredito) return "";
+  if (h.veredito === "boa") return `<span class="tag real" title="${esc(h.motivo || "")}">promoção real</span>`;
+  if (h.veredito === "inflada") return `<span class="tag falsa" title="${esc(h.motivo || "")}">desconto inflado</span>`;
+  if (h.veredito === "cara") return `<span class="tag cara" title="${esc(h.motivo || "")}">acima do normal</span>`;
+  return "";
+}
+
+// busca o histórico dos itens visíveis, em segundo plano, e atualiza os selos quando chega
+async function enriquecerHistorico(seletor) {
+  const alvos = [...document.querySelectorAll(`${seletor} .item`)].slice(0, 60);
+  for (const el of alvos) {
+    const k = el.dataset.k; if (!k) continue;
+    const [mercado, ...resto] = k.split("|");
+    const h = await historicoDe(mercado, resto.join("|"));
+    if (!h || !h.veredito || h.veredito === "sem_historico") continue;
+    const meta = el.querySelector(".meta");
+    if (meta && !meta.querySelector(".tag.real, .tag.falsa, .tag.cara")) meta.insertAdjacentHTML("beforeend", seloHistorico(h));
+    const corpo = el.querySelector(".corpo-item");
+    if (corpo && h.serie && h.serie.length > 1 && !corpo.querySelector(".hist")) {
+      corpo.insertAdjacentHTML("beforeend", svgHistorico(h.serie, h.mediana));
+    }
+  }
+}
+
+// ---------- família: lista compartilhada por código
+const Familia = {
+  codigo: (() => { try { return localStorage.getItem("ofertas-familia") || ""; } catch { return ""; } })(),
+  versao: 0, ultimoEnvio: 0,
+  salvarCodigo() {
+    try {
+      this.codigo ? localStorage.setItem("ofertas-familia", this.codigo) : localStorage.removeItem("ofertas-familia");
+    } catch {}
+  },
+  async entrar(codigo) {
+    const c = (codigo || "").trim().toUpperCase();
+    if (c.length < 8) throw new Error("O código tem 12 caracteres. Confira e tente de novo.");
+    const r = await apiFetch("/api/familia?codigo=" + encodeURIComponent(c)).then(x => x.json());
+    if (r.erro) throw new Error(r.erro);
+    this.codigo = c; this.versao = r.versao; this.salvarCodigo();
+    // o que está no aparelho é o que vale na primeira entrada; depois o servidor manda
+    if (r.dados && (r.dados.favoritos?.length || r.dados.lista?.length)) {
+      Dados.d = {favoritos: r.dados.favoritos || [], lista: r.dados.lista || []};
+      Dados.salvarLocal(); contadores(); desenharLista();
+    } else {
+      await this.enviar();
+    }
+    return r;
+  },
+  async criar() {
+    const r = await apiFetch("/api/familia", {method: "POST", body: JSON.stringify({dados: Dados.d})}).then(x => x.json());
+    if (r.erro) throw new Error(r.erro);
+    this.codigo = r.codigo; this.versao = r.versao; this.salvarCodigo();
+    return r;
+  },
+  async enviar() {
+    if (!this.codigo) return;
+    const agora = Date.now();
+    if (agora - this.ultimoEnvio < 800) return;   // agrupa digitação rápida
+    this.ultimoEnvio = agora;
+    try {
+      const r = await apiFetch("/api/familia", {method: "POST", body: JSON.stringify(
+        {codigo: this.codigo, dados: Dados.d, versao: this.versao})}).then(x => x.json());
+      if (r.conflito) {
+        // outra pessoa gravou primeiro: fica com a versão dela e avisa
+        this.versao = r.versao;
+        if (r.dados) { Dados.d = {favoritos: r.dados.favoritos || [], lista: r.dados.lista || []}; Dados.salvarLocal(); contadores(); desenharLista(); }
+        avisoFamilia("A lista foi atualizada por outra pessoa da família.", "ok");
+      } else if (r.versao) {
+        this.versao = r.versao;
+      }
+    } catch {}
+  },
+  async sincronizar() {
+    if (!this.codigo) return;
+    try {
+      const r = await apiFetch("/api/familia?codigo=" + encodeURIComponent(this.codigo)).then(x => x.json());
+      if (r.erro || !r.dados) return;
+      if (r.versao !== this.versao) {
+        this.versao = r.versao;
+        Dados.d = {favoritos: r.dados.favoritos || [], lista: r.dados.lista || []};
+        Dados.salvarLocal(); contadores();
+        if ($("#lista").classList.contains("ativo")) { desenharLista(); calcularLista(); }
+        if ($("#favoritos").classList.contains("ativo")) carregarFavoritos();
+      }
+    } catch {}
+  },
+};
+function avisoFamilia(msg, tipo) {
+  const el = $("#estadoFamilia"); if (!el) return;
+  el.innerHTML = msg ? `<div class="${tipo === "ok" ? "info" : "aviso"}">${esc(msg)}</div>` : "";
+}
+function desenharFamilia() {
+  const dentro = !!Familia.codigo;
+  $("#btnSairFamilia").hidden = !dentro;
+  $("#btnEntrarFamilia").hidden = dentro;
+  $("#btnCriarFamilia").hidden = dentro;
+  $("#codigoFamilia").value = Familia.codigo || "";
+  $("#codigoFamilia").readOnly = dentro;
+  $("#infoFamilia").textContent = dentro
+    ? "Lista compartilhada ligada. Quem tiver este código vê e edita a mesma lista e os mesmos favoritos."
+    : "Entre com o código da família para todo mundo ver e editar a mesma lista e os mesmos favoritos.";
+  if (dentro) {
+    $("#estadoFamilia").innerHTML = `<div class="barra" style="margin:10px 0">
+      <span class="sub">Código da família:</span><span class="codigo-familia">${esc(Familia.codigo)}</span>
+      <button class="btn sec" id="btnCopiarCodigo" type="button">Copiar</button></div>
+      <div class="info">Mande este código para quem vai usar. Quem digitar entra na mesma lista. Não existe senha: quem tem o código, entra.</div>`;
+    const b = $("#btnCopiarCodigo");
+    if (b) b.onclick = async () => {
+      try { await navigator.clipboard.writeText(Familia.codigo); b.textContent = "Copiado"; }
+      catch { b.textContent = "Selecione e copie"; }
+      setTimeout(() => b.textContent = "Copiar", 2000);
+    };
+  } else {
+    $("#estadoFamilia").innerHTML = "";
+  }
+  carregarAlertas();
+  carregarSaude();
+}
+$("#btnEntrarFamilia").onclick = async () => {
+  try {
+    await Familia.entrar($("#codigoFamilia").value);
+    avisoFamilia("Você entrou na lista da família.", "ok");
+    desenharFamilia();
+  } catch (e) { avisoFamilia(e.message); }
+};
+$("#btnCriarFamilia").onclick = async () => {
+  try {
+    const r = await Familia.criar();
+    avisoFamilia("Lista criada. Mande o código para a família.", "ok");
+    desenharFamilia();
+  } catch (e) { avisoFamilia(e.message); }
+};
+$("#btnSairFamilia").onclick = () => {
+  Familia.codigo = ""; Familia.versao = 0; Familia.salvarCodigo();
+  avisoFamilia("Você saiu. Sua lista continua neste aparelho, só não é mais compartilhada.", "ok");
+  desenharFamilia();
+};
+
+// ---------- alertas de preço
+// Telegram está desligado por decisão do dono. A função continua no código: aqui só mostramos
+// o estado e como ligar de novo, para a opção não desaparecer sem deixar rastro.
+function desenharEstadoTelegram(ligado) {
+  const alvo = $("#estadoTelegram");
+  if (!alvo) return;
+  $("#btnTesteTelegram").hidden = !ligado;
+  alvo.innerHTML = ligado
+    ? `<div class="info">📨 Telegram ligado: os alertas chegam por mensagem.</div>`
+    : `<div class="info">🔕 <b>Telegram desligado.</b> Os alertas continuam sendo criados e conferidos todo dia,
+       e o que bateu o alvo aparece aqui embaixo. Para receber por mensagem, defina
+       <code>ALERTAS_TELEGRAM=1</code> junto com <code>TELEGRAM_TOKEN</code> e <code>TELEGRAM_CHAT</code>
+       no <code>.env</code> do servidor e reinicie. Instruções no LEIAME.md.</div>`;
+}
+
+async function carregarAlertas() {
+  if (Estatico.ativo && !AoVivo.ativo) {
+    $("#listaAlertas").innerHTML = `<div class="aviso">Os alertas de preço precisam do app com servidor: é ele que confere os preços e fala com o Telegram. Veja o LEIAME.md, seção “Hospedar num Debian”.</div>`;
+    return;
+  }
+  if (!Familia.codigo) {
+    $("#listaAlertas").innerHTML = `<div class="info">Entre na família para criar alertas.</div>`;
+    return;
+  }
+  const r = await apiFetch("/api/alertas?familia=" + encodeURIComponent(Familia.codigo)).then(x => x.json()).catch(() => ({alertas: []}));
+  desenharEstadoTelegram(r.telegram);
+  const lista = r.alertas || [];
+  $("#listaAlertas").innerHTML = lista.length ? lista.map(a => `
+    <div class="linha-alerta${a.ativo ? "" : " off"}" data-id="${a.id}">
+      <div><div class="txt">${esc(a.nome)}</div>
+        <div class="onde">${a.mercado ? esc(a.mercado) + " · " : ""}avisa abaixo de <span class="alvo">${brl(a.alvo)}</span>
+        ${a.ultimo_preco ? ` · visto por ${brl(a.ultimo_preco)}` : ""}</div></div>
+      <button class="acao" data-c="toggle" title="${a.ativo ? "Desligar" : "Ligar"}" type="button">${a.ativo ? "🔔" : "🔕"}</button>
+      <button class="acao" data-c="del" title="Apagar" type="button">✕</button>
+    </div>`).join("") : `<div class="info">Nenhum alerta ainda.</div>`;
+}
+$("#formAlerta").onsubmit = async e => {
+  e.preventDefault();
+  if (!Familia.codigo) { avisoFamilia("Crie ou entre numa família primeiro."); return; }
+  const nome = $("#alertaProduto").value.trim(), alvo = parseFloat($("#alertaAlvo").value);
+  if (!nome || !(alvo > 0)) return;
+  const r = await apiFetch("/api/alertas", {method: "POST", body: JSON.stringify(
+    {familia: Familia.codigo, nome, alvo, termo: nome})}).then(x => x.json());
+  if (r.erro) { $("#avisoAlertas").innerHTML = `<div class="aviso">${esc(r.erro)}</div>`; return; }
+  $("#alertaProduto").value = ""; $("#alertaAlvo").value = "";
+  $("#avisoAlertas").innerHTML = `<div class="info">Alerta criado. Ele é conferido todo dia depois da coleta.</div>`;
+  carregarAlertas();
+};
+$("#listaAlertas").onclick = async e => {
+  const b = e.target.closest("[data-c]"); if (!b) return;
+  const id = +b.closest("[data-id]").dataset.id;
+  if (b.dataset.c === "del") await apiFetch("/api/alertas", {method: "POST", body: JSON.stringify({familia: Familia.codigo, apagar: id})});
+  if (b.dataset.c === "toggle") await apiFetch("/api/alertas", {method: "POST", body: JSON.stringify({familia: Familia.codigo, id, ativo: b.textContent === "🔕" ? 1 : 0})});
+  carregarAlertas();
+};
+$("#btnTesteTelegram").onclick = async () => {
+  const r = await apiFetch("/api/alertas/teste", {method: "POST", body: "{}"}).then(x => x.json()).catch(() => ({ok: false, detalhe: "sem servidor"}));
+  $("#avisoAlertas").innerHTML = r.ok ? `<div class="info">Mensagem enviada. Confira o Telegram.</div>`
+    : `<div class="aviso">Não deu: ${esc(r.detalhe)}. Configure TELEGRAM_TOKEN e TELEGRAM_CHAT no servidor.</div>`;
+};
+$("#btnChecarAlertas").onclick = async () => {
+  $("#avisoAlertas").innerHTML = `<div class="info">Conferindo…</div>`;
+  const r = await apiFetch("/api/alertas/checar", {method: "POST", body: "{}"}).then(x => x.json()).catch(() => ({}));
+  const d = r.disparos || [], bateram = r.bateram || [];
+  if (r.telegram) {
+    $("#avisoAlertas").innerHTML = `<div class="info">${r.alertas || 0} alerta(s) conferido(s) · ${d.length} aviso(s) enviado(s) · ${r.silenciados || 0} em silêncio.</div>`;
+  } else if (bateram.length) {
+    // sem Telegram a mensagem não sai, então o resultado aparece na tela
+    $("#avisoAlertas").innerHTML = `<div class="info">${r.alertas || 0} alerta(s) conferido(s) · <b>${bateram.length} bateu o alvo</b> (Telegram desligado, aviso mostrado aqui):</div>` +
+      bateram.map(a => `<div class="linha-alerta"><div><div class="txt">${esc(a.nome)}</div>
+        <div class="onde">${esc(a.mercado || "")} · ${brl(a.preco)} (alvo ${brl(a.alvo)})${a.veredito ? " · " + esc(a.veredito) : ""}</div></div></div>`).join("");
+  } else {
+    $("#avisoAlertas").innerHTML = `<div class="info">${r.alertas || 0} alerta(s) conferido(s) · nenhum bateu o alvo agora · ${r.silenciados || 0} em silêncio · ${r.sem_preco || 0} sem preço.</div>`;
+  }
+  carregarAlertas();
+};
+$("#btnResumoSemana").onclick = async () => {
+  if (!Familia.codigo) { avisoFamilia("Entre na família primeiro."); return; }
+  const r = await apiFetch("/api/resumo-semanal", {method: "POST", body: JSON.stringify({familia: Familia.codigo})}).then(x => x.json()).catch(() => ({}));
+  $("#avisoAlertas").innerHTML = r.texto ? `<div class="total" style="white-space:pre-wrap">${esc(r.texto)}</div>`
+    : `<div class="aviso">${esc(r.erro || "sem dados")}</div>`;
+};
+
+async function carregarSaude() {
+  const s = await apiFetch("/api/saude" + (Familia.codigo ? "?familia=" + encodeURIComponent(Familia.codigo) : "")).then(x => x.json()).catch(() => null);
+  if (!s) { $("#saude").innerHTML = `<div class="sub">Disponível só no app com servidor.</div>`; return; }
+  const h = s.historico || {};
+  if (s.estatico) {
+    $("#saude").innerHTML = `
+      <div class="${s.ok ? "ok" : "ruim"}">${s.ok ? "✓ site publicado em dia" : "⚠ " + s.avisos.join(" · ")}</div>
+      <div class="sub">Última geração: ${s.ultima_coleta_horas == null ? "desconhecida" : `há ${s.ultima_coleta_horas} h`}</div>
+      <div class="sub">Histórico: ${(h.p || 0).toLocaleString("pt-BR")} produtos com série de preço</div>
+      <div class="sub">Alertas e lista compartilhada: só no app com servidor</div>`;
+    return;
+  }
+  $("#saude").innerHTML = `
+    <div class="${s.ok ? "ok" : "ruim"}">${s.ok ? "✓ tudo em ordem" : "⚠ " + s.avisos.join(" · ")}</div>
+    <div class="sub">Última coleta: ${s.ultima_coleta_horas == null ? "nunca" : `há ${s.ultima_coleta_horas} h`}</div>
+    <div class="sub">Histórico: ${(h.n || 0).toLocaleString("pt-BR")} preços · ${h.d || 0} dia(s) · ${(h.p || 0).toLocaleString("pt-BR")} produtos</div>
+    <div class="sub">Telegram: ${s.telegram ? "ligado" : "desligado"} · ${s.alertas_ativos || 0} alerta(s) ativo(s)</div>`;
+}
 
 // ---------- lista de compras
 let precosLista = {};   // id do item -> {melhor, por_mercado, fixo}
@@ -912,6 +1322,26 @@ $("#itensLista").addEventListener("click", e => {
 });
 $("#btnCalcLista").onclick = () => { calcularLista.forcar = true; calcularLista(); };
 $("#btnLimparFeitos").onclick = () => { Dados.d.lista = Dados.d.lista.filter(i => !i.feito); Dados.salvar(); desenharLista(); };
+
+// modo mercado: letras grandes, sem preço, para ir marcando no corredor
+$("#btnModoMercado").onclick = () => {
+  const on = document.body.classList.toggle("modo-mercado");
+  $("#btnModoMercado").textContent = on ? "Sair do modo mercado" : "Modo mercado";
+  if (on) document.querySelector('nav [data-aba="lista"]').click();
+};
+$("#btnWhatsapp").onclick = () => {
+  const pend = Dados.d.lista.filter(i => !i.feito);
+  if (!pend.length) return;
+  const linhas = ["*Lista de compras*", ""];
+  for (const i of pend) {
+    const pr = precosLista[i.id] || {};
+    const usado = pr.fixo || pr.melhor;
+    linhas.push(`• ${i.qtd > 1 ? i.qtd + "x " : ""}${i.texto}${usado ? ` — ${reais(usado.preco * i.qtd)} no ${usado.mercado}` : ""}`);
+  }
+  if (Familia.codigo) linhas.push("", `Lista da família: ${Familia.codigo}`);
+  const url = "https://wa.me/?text=" + encodeURIComponent(linhas.join("\n"));
+  window.open(url, "_blank", "noopener");
+};
 
 // ---------- CEP
 function mostrarCep(info) {
@@ -1006,6 +1436,9 @@ function acompanhar() { if (!timer) timer = setInterval(status, 1500); status();
     $("#infoBusca").textContent = `Preços coletados em ${d.toLocaleDateString("pt-BR")} às ${d.toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}. Atualiza sozinho todo dia.`;
   }
   await Dados.carregar();
+  // família: se este aparelho já entrou numa, pega a versão mais nova antes de desenhar a lista
+  if (Familia.codigo) await Familia.sincronizar();
+  desenharFamilia();
   apiFetch("/api/local").then(r => r.json()).then(info => {
     mostrarCep(info);
     // pede o CEP na primeira visita (depois disso, cada região usa o CEP salvo ou o padrão dela)
@@ -1017,6 +1450,12 @@ function acompanhar() { if (!timer) timer = setInterval(status, 1500); status();
   montarLojasAssai(s);
   desenharRegioes(); montarMercadosOf();
   if (s.trabalho.tarefa && !s.trabalho.fim) acompanhar();
+  // de tempos em tempos, busca a lista da família de novo (alguém marcou "leite" no mercado)
+  setInterval(() => { if (Familia.codigo && !document.hidden) Familia.sincronizar(); }, 20000);
+  // app instalável: service worker guarda a casca e os últimos preços para usar dentro do mercado
+  if ("serviceWorker" in navigator && location.protocol !== "file:") {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
 })();
 </script>
 </body>

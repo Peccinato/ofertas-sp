@@ -49,6 +49,7 @@ def buscar_vtex(mercado, host, termo, n=24):
             mercado=mercado, nome=p.get("productName", ""), preco=preco,
             preco_de=oferta.get("ListPrice"), marca=p.get("brand", ""), imagem=img,
             url=f"https://{VTEX_SITE.get(host, host)}/{p.get('linkText', '')}/p",
+            ean=str(item.get("ean") or "").strip(),
         ).finalizar())
     return out
 
@@ -73,6 +74,7 @@ def buscar_gpa(mercado, termo, n=24):
             mercado=mercado, nome=p.get("name", ""), preco=p["price"], preco_de=p.get("priceFrom"),
             marca=p.get("brand", ""), imagem=img, url=p.get("urlDetails", ""), extra=extra,
             validade=(promo.get("endDate") or "")[:10],
+            ean=str(p.get("ean") or p.get("gtin") or "").strip(),
         ).finalizar())
     return out
 

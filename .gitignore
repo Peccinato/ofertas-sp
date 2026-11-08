@@ -1,7 +1,12 @@
 ofertas.db
+historico.db
 __pycache__/
 *.pyc
 .claude/
 site/
 worker/.wrangler/
 node_modules/
+.env
+log*.txt
+backups/
+.perch/

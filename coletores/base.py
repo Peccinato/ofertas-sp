@@ -75,6 +75,7 @@ class Produto:
     unidade: str = ""                  # "kg", "L" ou "un"
     preco_unidade: float | None = None # R$ por kg / L / unidade
     desconto: float = field(default=0.0)
+    ean: str = ""                      # código de barras, quando a loja informa
 
     def finalizar(self):
         if self.preco_de and self.preco_de > self.preco > 0:
