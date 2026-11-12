@@ -107,11 +107,18 @@ def main():
     lidos = {}
     ia_ok = extrator_ia.disponivel()[0]
     novos = 0
+    # a leitura com IA é a parte lenta e incerta da coleta: passado este tempo (contado do início),
+    # o que falta fica para a próxima execução, em vez de estourar o limite do Actions e não publicar nada
+    limite_ia = inicio + 60 * float(os.environ.get("OFERTAS_MINUTOS_IA") or 40)
     for f in intercalar_por_mercado(db.listar_folhetos()):
         img = f["imagem"]
         try:
             if img in cache:
                 app.ler_folheto(img, itens=cache[img])
+            elif ia_ok and time.time() > limite_ia:
+                print("  Tempo da leitura com IA esgotado; os folhetos restantes ficam para a próxima coleta.")
+                ia_ok = False
+                continue
             elif ia_ok:
                 app.ler_folheto(img)
                 novos += 1
@@ -164,57 +171,80 @@ def main():
 def exportar_historico(dias=120, max_produtos=6000, anteriores=None):
     """Histórico enxuto para o site estático.
 
-    Formato compacto de propósito: {chave: [[dia_epoch, preco], ...]}. O site publicado já carrega
-    11 MB de catálogo; o histórico não pode dobrar isso. Só entram os produtos que ainda estão no
-    catálogo e que têm pelo menos 2 dias observados, porque um ponto só não desenha nada.
+    Formato compacto de propósito: {chave: [[dia_epoch, preco], ...]}, um ponto por dia. O site
+    publicado já carrega 11 MB de catálogo; por isso o histórico tem teto de produtos e de dias.
 
     `anteriores` é o historico.json do site publicado. O GitHub Actions roda em máquina limpa, sem
-    banco de histórico: sem isso, cada execução recomeçaria do zero e o gráfico nunca passaria de um
-    dia. O site publicado é, ele mesmo, o arquivo de longo prazo.
+    banco de histórico: cada execução só conhece o dia de hoje. Por isso os dias já publicados são
+    SOMADOS aos do banco, produto a produto (no mesmo dia, vale o banco). O site publicado é, ele
+    mesmo, o arquivo de longo prazo.
     """
     import historico as hist
+    anteriores = anteriores if isinstance(anteriores, dict) else {}
+    corte = time.time() - dias * 86400
+    desde = time.strftime("%Y-%m-%d", time.localtime(corte))
+
+    def dia_de(ep):
+        return time.strftime("%Y-%m-%d", time.localtime(ep))
+
+    def limpar(serie):
+        """Pontos válidos e dentro da janela, como {dia: [epoch, preco]}."""
+        pontos = {}
+        for p in serie if isinstance(serie, list) else []:
+            try:
+                ep, preco = int(p[0]), round(float(p[1]), 2)
+            except (TypeError, ValueError, IndexError):
+                continue
+            if ep >= corte - 86400 and preco > 0:
+                pontos[dia_de(ep)] = [ep, preco]
+        return pontos
+
+    banco = {}   # chave -> {dia: [epoch, preco]}
     try:
         hist.criar()
-    except Exception as e:   # noqa: BLE001
-        print("  ! histórico indisponível:", e)
-        return anteriores or {}
-    desde = time.strftime("%Y-%m-%d", time.localtime(time.time() - dias * 86400))
-    out, n = {}, 0
-    try:
         with hist.conectar() as con:
             rows = con.execute("""
                 SELECT mercado, nome, dia, MIN(preco) preco FROM precos
                 WHERE dia >= ? GROUP BY mercado, nome, dia ORDER BY mercado, nome, dia
             """, (desde,)).fetchall()
+        for r in rows:
+            try:
+                ep = int(time.mktime(time.strptime(r["dia"], "%Y-%m-%d")))
+            except ValueError:
+                continue
+            banco.setdefault(f"{r['mercado']}|{r['nome']}", {})[r["dia"]] = [ep, round(r["preco"], 2)]
     except Exception as e:   # noqa: BLE001
-        print("  ! histórico ilegível:", e)
-        return anteriores or {}
-    for r in rows:
-        k = f"{r['mercado']}|{r['nome']}"
-        if k not in out and n >= max_produtos:
-            continue
-        if k not in out:
-            n += 1
-        try:
-            ep = int(time.mktime(time.strptime(r["dia"], "%Y-%m-%d")))
-        except ValueError:
-            continue
-        out.setdefault(k, []).append([ep, round(r["preco"], 2)])
+        print("  ! histórico indisponível:", e)
 
-    # mescla com o que já estava publicado: o dia novo manda, o passado é preservado
-    herdados = 0
-    for k, serie in (anteriores or {}).items():
-        if k in out:
-            continue
-        if n >= max_produtos:
-            break
-        if isinstance(serie, list) and len(serie) >= 2:
-            out[k] = serie
-            n += 1
-            herdados += 1
-    if herdados:
-        print(f"Histórico: {herdados} produtos herdados do site publicado")
-    print(f"Histórico exportado: {len(out)} produtos, {sum(len(v) for v in out.values())} pontos")
+    # soma o publicado com o banco: o passado é preservado e o dia novo entra (ou corrige o mesmo dia)
+    series, continuados = {}, 0
+    for k in set(banco) | set(anteriores):
+        pontos = limpar(anteriores.get(k))
+        if pontos and k in banco:
+            continuados += 1
+        pontos.update(banco.get(k, {}))
+        if pontos:
+            series[k] = [pontos[d] for d in sorted(pontos)]
+
+    # teto de produtos: primeiro quem já tem mais dias (a série não pode ser interrompida);
+    # no empate, um de cada mercado por vez, para nenhuma rede ficar de fora
+    if len(series) > max_produtos:
+        por_mercado = {}
+        for k in sorted(series, key=lambda k: (-len(series[k]), k)):
+            por_mercado.setdefault(k.split("|", 1)[0], []).append(k)
+        ordem, filas = [], list(por_mercado.values())
+        while filas and len(ordem) < max_produtos:
+            mais = max(len(series[f[0]]) for f in filas)
+            for f in filas:
+                if len(ordem) < max_produtos and len(series[f[0]]) == mais:
+                    ordem.append(f.pop(0))
+            filas = [f for f in filas if f]
+        series = {k: series[k] for k in ordem}
+    out = {k: series[k] for k in sorted(series)}
+    if continuados:
+        print(f"Histórico: {continuados} produtos continuam a série do site publicado")
+    print(f"Histórico exportado: {len(out)} produtos, {sum(len(v) for v in out.values())} pontos, "
+          f"até {max((len(v) for v in out.values()), default=0)} dias por produto")
     return out
 
 

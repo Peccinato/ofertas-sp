@@ -1,11 +1,28 @@
 # Estado da sessão — Ofertas SP
 
-Última atualização: 2026-11-08 20:45 (America/Sao_Paulo)
+Última atualização: 2026-11-12 (America/Sao_Paulo)
 
 Este arquivo existe para a sessão poder ser compactada sem perder o fio. Se você (ou outra
 sessão) retomar este trabalho, leia isto primeiro e continue daqui.
 
 ---
+
+## Correções de 12/11/2026 (Claude)
+
+O site ficou parado nos dados de 09/11 e o histórico nunca passou de 1 ponto por produto. Corrigido:
+
+- **Histórico não acumulava.** `exportar_historico` descartava os dias já publicados sempre que o
+  produto aparecia na coleta do dia (ou seja, sempre). Agora soma dia a dia; no mesmo dia vale o
+  banco. O teto de 6.000 produtos dá preferência às séries mais longas e reparte entre os mercados.
+- **Coleta cancelada aos 60 min** (10 e 11/11). A leitura dos folhetos com IA esperava até 180 s por
+  página. Agora: 25 s para baixar a imagem, 100 s para a IA, e a leitura para aos 40 min de coleta
+  (`OFERTAS_MINUTOS_IA`); o que falta fica para o dia seguinte. Limite do Actions subiu para 90 min.
+- **Pague Menos dava 404 em tudo.** A loja trocou a plataforma para VTEX; passou a usar `buscar_vtex`.
+  A busca VTEX ganhou `allowRedirect=false` (sem isso "arroz" voltava vazio).
+- **Gemini recusava imagens "binary/octet-stream".** O tipo agora sai da extensão do arquivo.
+- A seção "O que ainda NÃO foi feito", mais abaixo, é de antes da publicação: os itens 1 e 2 já não valem.
+
+Testes: 62, todos passando. Backup em `backups/antes-correcao-2026-11-12-0509/`.
 
 ## O que foi pedido
 

@@ -423,30 +423,98 @@ class TestExportacao(BaseComBancos):
         import gerar_site
         self.assertEqual(gerar_site.exportar_historico(), {})
 
+    @staticmethod
+    def _dias_atras(n, preco):
+        """Ponto no formato publicado: [epoch da meia-noite de n dias atrás, preço]."""
+        import time
+        dia = time.strftime("%Y-%m-%d", time.localtime(time.time() - n * 86400))
+        return [int(time.mktime(time.strptime(dia, "%Y-%m-%d"))), preco]
+
     def test_exportar_herda_historico_do_site_publicado(self):
         """O Actions roda sem banco: o publicado é o arquivo de longo prazo."""
         import gerar_site
         self.serie("Covabra", "Café", [10.0, 11.0])
-        anterior = {"Assaí|Arroz": [[1700000000, 20.0], [1700086400, 21.0]]}
+        anterior = {"Assaí|Arroz": [self._dias_atras(3, 20.0), self._dias_atras(2, 21.0)]}
         h = gerar_site.exportar_historico(anteriores=anterior)
         self.assertIn("Covabra|Café", h, "o dia novo tem que entrar")
         self.assertIn("Assaí|Arroz", h, "o passado publicado tem que ser preservado")
         self.assertEqual(h["Assaí|Arroz"], anterior["Assaí|Arroz"])
 
     def test_exportar_sem_banco_mas_com_anterior_nao_perde_nada(self):
-        """Cenário do Actions: banco vazio, só o publicado. Não pode devolver vazio."""
+        """Banco vazio, só o publicado. Não pode devolver vazio."""
         import gerar_site
-        anterior = {"Assaí|Arroz": [[1700000000, 20.0], [1700086400, 21.0]]}
+        anterior = {"Assaí|Arroz": [self._dias_atras(3, 20.0), self._dias_atras(2, 21.0)]}
         h = gerar_site.exportar_historico(anteriores=anterior)
         self.assertEqual(h, anterior)
 
-    def test_serie_do_banco_vence_a_publicada(self):
-        """Se o produto está nos dois, vale o banco (é o dado mais novo)."""
+    def test_dia_novo_soma_aos_dias_publicados(self):
+        """O caso real do Actions: o banco só tem hoje e o site publicado tem os dias de antes.
+        Era aqui que o histórico parava em 1 ponto: os dias publicados eram jogados fora."""
         import gerar_site
-        self.serie("Covabra", "Café", [10.0, 11.0])
-        anterior = {"Covabra|Café": [[1700000000, 99.0], [1700086400, 98.0]]}
+        self.serie("Covabra", "Café", [12.0], dias_atras=[0])                      # só o dia de hoje
+        anterior = {"Covabra|Café": [self._dias_atras(2, 10.0), self._dias_atras(1, 11.0)]}
         h = gerar_site.exportar_historico(anteriores=anterior)
-        self.assertNotIn(99.0, [p[1] for p in h["Covabra|Café"]])
+        self.assertEqual([p[1] for p in h["Covabra|Café"]], [10.0, 11.0, 12.0])
+        # e no dia seguinte continua crescendo, mesmo partindo de um publicado com 1 ponto só
+        h2 = gerar_site.exportar_historico(anteriores={"Covabra|Café": [self._dias_atras(1, 11.0)]})
+        self.assertEqual([p[1] for p in h2["Covabra|Café"]], [11.0, 12.0])
+
+    def test_mesmo_dia_vale_o_banco(self):
+        """Coleta repetida no mesmo dia não duplica o ponto: fica o preço do banco."""
+        import gerar_site
+        self.serie("Covabra", "Café", [12.0], dias_atras=[0])
+        h = gerar_site.exportar_historico(anteriores={"Covabra|Café": [self._dias_atras(0, 99.0)]})
+        self.assertEqual([p[1] for p in h["Covabra|Café"]], [12.0])
+
+    def test_pontos_velhos_ou_quebrados_saem(self):
+        import gerar_site
+        anterior = {"Assaí|Arroz": [[1700000000, 20.0], self._dias_atras(2, 21.0), ["x", 1], [5]],
+                    "Assaí|Feijão": [[1700000000, 8.0]], "Assaí|Lixo": "não é lista"}
+        h = gerar_site.exportar_historico(anteriores=anterior)
+        self.assertEqual(h, {"Assaí|Arroz": [self._dias_atras(2, 21.0)]})
+
+    def test_teto_prefere_quem_tem_mais_dias_e_reparte_entre_mercados(self):
+        import gerar_site
+        anterior = {f"Akki|Item {i}": [self._dias_atras(1, 5.0)] for i in range(5)}
+        anterior["Zaffari|Leite"] = [self._dias_atras(1, 6.0)]
+        anterior["Zaffari|Café"] = [self._dias_atras(3, 9.0), self._dias_atras(2, 9.5), self._dias_atras(1, 9.0)]
+        h = gerar_site.exportar_historico(max_produtos=3, anteriores=anterior)
+        self.assertEqual(len(h), 3)
+        self.assertIn("Zaffari|Café", h, "a série mais longa não pode ser cortada")
+        self.assertIn("Zaffari|Leite", h, "o último mercado da ordem alfabética também entra")
+
+
+class TestLeitorDeFolhetos(unittest.TestCase):
+
+    def test_tipo_da_imagem_aceito_pelo_gemini(self):
+        from coletores.extrator_ia import _tipo_da_imagem as t
+        self.assertEqual(t("https://x/campanha-50023-pagina-1.jpeg", "binary/octet-stream"), "image/jpeg")
+        self.assertEqual(t("https://x/a.png?v=2", "application/octet-stream"), "image/png")
+        self.assertEqual(t("https://x/a.webp", "text/plain"), "image/webp")
+        self.assertEqual(t("https://x/TABLOIDE.PDF", "image/jpeg"), "application/pdf")
+        self.assertEqual(t("https://x/sem-extensao", "image/png"), "image/png")
+        self.assertEqual(t("https://x/sem-extensao", ""), "image/jpeg")
+
+
+class TestColetores(unittest.TestCase):
+
+    def test_pague_menos_usa_a_busca_vtex(self):
+        """Em 11/2026 a loja trocou de plataforma e a busca antiga passou a dar 404."""
+        from coletores import sites
+        self.assertEqual(sites.VTEX.get("Pague Menos"), "www.superpaguemenos.com.br")
+        self.assertIn("Pague Menos", dict(sites.fontes("paulinia")))
+
+    def test_busca_vtex_nao_aceita_redirecionamento(self):
+        """Sem allowRedirect=false, "arroz" volta com zero produtos e um redirecionamento."""
+        from coletores import sites
+        vistos = []
+        original = sites.http_json
+        sites.http_json = lambda url, *a, **k: vistos.append(url) or {"products": []}
+        try:
+            sites.buscar_vtex("Pague Menos", "www.superpaguemenos.com.br", "arroz")
+        finally:
+            sites.http_json = original
+        self.assertIn("allowRedirect=false", vistos[0])
 
 
 class TestInterface(unittest.TestCase):

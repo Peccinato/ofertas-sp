@@ -469,7 +469,7 @@ function finalizar(p) {
 const reais = v => "R$ " + v.toFixed(2).replace(".", ",");
 
 // ---------- busca ao vivo nas lojas, pelo proxy do Cloudflare, com o CEP de cada aparelho
-const VTEX_LOJAS = {"Atacadão": "www.atacadao.com.br", "Sam's Club": "www.samsclub.com.br", "Mambo": "www.mambo.com.br",
+const VTEX_LOJAS = {"Pague Menos": "www.superpaguemenos.com.br", "Atacadão": "www.atacadao.com.br", "Sam's Club": "www.samsclub.com.br", "Mambo": "www.mambo.com.br",
   "Oba Hortifruti": "www.obahortifruti.com.br", "Coop": "www.coopsupermercado.com.br", "Savegnago": "www.savegnago.com.br",
   "Zaffari": "www.zaffari.com.br", "Swift": "www.swift.com.br", "Covabra": "www.covabra.com.br", "BOA": "boa.vtexcommercestable.com.br"};
 const VTEX_SITE = {"boa.vtexcommercestable.com.br": "www.boasupermercados.com.br"};   // API em outro domínio que a loja
@@ -554,7 +554,7 @@ const AoVivo = {
     const k = Regiao.atual + ":" + semAcento(termo).trim(), salvo = this.cache.get(k);
     if (salvo && Date.now() - salvo.t < 30 * 60e3) return salvo.r;
     const fontes = {"Pão de Açúcar": () => this.gpa("Pão de Açúcar", termo, n), "Extra": () => this.gpa("Extra", termo, n), "Tenda Atacado": () => this.tenda(termo, n), "Sonda": () => this.sonda(termo, n),
-      "Carrefour": () => this.carrefour(termo, n), "Pague Menos": () => this.paguemenos(termo, n),
+      "Carrefour": () => this.carrefour(termo, n),
       ...Object.fromEntries(Object.entries(VTEX_LOJAS).map(([m, h]) => [m, () => this.vtex(m, h, termo, n)]))};
     for (const m of Object.keys(fontes)) if (!Regiao.tem(m)) delete fontes[m];   // só as redes da região
     const produtos = [], erros = {};
@@ -567,7 +567,7 @@ const AoVivo = {
     return r;
   },
   async vtex(mercado, host, termo, n) {
-    let url = `https://${host}/api/io/_v/api/intelligent-search/product_search/?query=${encodeURIComponent(termo)}&count=${n}&locale=pt-BR`;
+    let url = `https://${host}/api/io/_v/api/intelligent-search/product_search/?query=${encodeURIComponent(termo)}&count=${n}&locale=pt-BR&allowRedirect=false`;
     const rid = this.local?.regiao?.vtex?.[host];
     if (rid) url += "&regionId=" + encodeURIComponent(rid);
     const d = await this.json(url);
@@ -620,22 +620,6 @@ const AoVivo = {
       const de = t.match(/line-through[^>]*>\s*R\$\s*([\d.]+,\d{2})/), img = t.match(/<img [^>]*src="([^"]+)"/);
       return [{mercado: "Carrefour", nome: decodificar(nome[1].replace(/<[^>]+>/g, "")).trim(), preco: real(preco[1]),
                preco_de: de ? real(de[1]) : null, imagem: img ? decodificar(img[1]) : "", url: base + m[1]}];
-    });
-  },
-  // Pague Menos (loja Convertize): a página de busca já traz os produtos no HTML
-  async paguemenos(termo, n) {
-    const base = "https://www.superpaguemenos.com.br";
-    const h = await this.pedir(`${base}/busca/?q=${encodeURIComponent(termo)}`).then(r => r.text());
-    const inicios = [...h.matchAll(/<div\s+class="item-product"/g)].map(m => m.index);
-    const real = t => +t.replace(/\./g, "").replace(",", ".");
-    const txt = document.createElement("textarea"), decodificar = s => (txt.innerHTML = s, txt.value);
-    return inicios.slice(0, n).flatMap((ini, i) => {
-      const b = h.slice(ini, inicios[i + 1] ?? ini + 8000);
-      const nome = b.match(/<h2 class="title"><a href="([^"]+)">\s*([\s\S]*?)\s*<\/a>/), preco = b.match(/class="sale-price"><strong>\s*R\$\s*([\d.]+,\d{2})/);
-      if (!nome || !preco) return [];
-      const de = b.match(/class="unit-price[^"]*"><span>\s*R\$\s*([\d.]+,\d{2})/), img = b.match(/data-src="([^"]+)"/);
-      return [{mercado: "Pague Menos", nome: decodificar(nome[2]).trim(), preco: real(preco[1]), preco_de: de ? real(de[1]) : null,
-               imagem: img ? "https:" + img[1] : "", url: base + nome[1]}];
     });
   },
   async sonda(termo, n) {

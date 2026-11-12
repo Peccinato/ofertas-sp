@@ -16,6 +16,7 @@ VTEX = {
     "Zaffari": "www.zaffari.com.br",
     "Swift": "www.swift.com.br",
     "Covabra": "www.covabra.com.br",
+    "Pague Menos": "www.superpaguemenos.com.br",   # desde 11/2026 a loja é VTEX (antes era Convertize)
     "BOA": "boa.vtexcommercestable.com.br",   # a loja nova da BOA não expõe a API no próprio domínio
 }
 # domínio da loja para montar o link do produto, quando a API fica em outro endereço
@@ -30,7 +31,7 @@ GPA = {"Pão de Açúcar": ("pa", 461, "gpa_loja"), "Extra": ("ex", 570, "extra_
 
 
 def buscar_vtex(mercado, host, termo, n=24):
-    url = f"https://{host}/api/io/_v/api/intelligent-search/product_search/?query={quote(termo)}&count={n}&locale=pt-BR"
+    url = f"https://{host}/api/io/_v/api/intelligent-search/product_search/?query={quote(termo)}&count={n}&locale=pt-BR&allowRedirect=false"   # sem isso, termo que vira categoria ("arroz") volta vazio
     if REGIAO["vtex"].get(host):
         url += "&regionId=" + quote(REGIAO["vtex"][host])
     d = http_json(url)
@@ -160,37 +161,12 @@ def buscar_carrefour(termo, n=24):
     return out
 
 
-_PM_ITEM = re.compile(r'<div\s+class="item-product"')
-
-
-def buscar_paguemenos(termo, n=24):
-    # loja Convertize: a página de busca vem com os produtos no HTML
-    base = "https://www.superpaguemenos.com.br"
-    h = http(f"{base}/busca/?q={quote(termo)}", timeout=30)
-    blocos = [m.start() for m in _PM_ITEM.finditer(h)]
-    out = []
-    for i, ini in enumerate(blocos[:n]):
-        b = h[ini: blocos[i + 1] if i + 1 < len(blocos) else ini + 8000]
-        nome = re.search(r'<h2 class="title"><a href="([^"]+)">\s*(.*?)\s*</a>', b, re.S)
-        preco = re.search(r'class="sale-price"><strong>\s*' + _PRECO.pattern, b)
-        if not nome or not preco:
-            continue
-        de = re.search(r'class="unit-price[^"]*"><span>\s*' + _PRECO.pattern, b)
-        img = re.search(r'data-src="([^"]+)"', b)
-        out.append(Produto(
-            mercado="Pague Menos", nome=html.unescape(nome.group(2)).strip(), preco=_reais(preco.group(1)),
-            preco_de=_reais(de.group(1)) if de else None, imagem=("https:" + img.group(1)) if img else "",
-            url=base + nome.group(1),
-        ).finalizar())
-    return out
-
-
 def fontes(regiao=None):
     """Lista de (nome do mercado, função de busca); com `regiao`, só as redes daquela região."""
     from .regioes import REGIOES
     lista = [(m, lambda termo, n=24, _m=m: buscar_gpa(_m, termo, n)) for m in GPA]
     lista += [("Tenda Atacado", buscar_tenda), ("Sonda", buscar_sonda),
-              ("Carrefour", buscar_carrefour), ("Pague Menos", buscar_paguemenos)]
+              ("Carrefour", buscar_carrefour)]
     for nome, host in VTEX.items():
         lista.append((nome, lambda termo, n=24, _m=nome, _h=host: buscar_vtex(_m, _h, termo, n)))
     if regiao:

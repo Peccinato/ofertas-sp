@@ -120,19 +120,30 @@ def _baixar(url):
     for i, u in enumerate(tentativas):
         try:
             req = urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/128 Safari/537.36"})
-            with urllib.request.urlopen(req, timeout=60) as r:
+            with urllib.request.urlopen(req, timeout=25) as r:   # imagem que não vem em 25 s fica para a próxima coleta
                 return r.read(), (r.headers.get_content_type() or "image/jpeg")
         except urllib.error.HTTPError:
             if i == len(tentativas) - 1:
                 raise
 
 
+def _tipo_da_imagem(url, tipo):
+    """Tipo aceito pelo Gemini. Alguns servidores mandam a imagem como "binary/octet-stream" ou
+    "text/plain": nesse caso vale a extensão do endereço e, sem ela, JPEG."""
+    caminho = urllib.parse.urlsplit(url).path.lower()
+    if caminho.endswith(".pdf"):
+        return "application/pdf"
+    if (tipo or "").startswith("image/"):
+        return tipo
+    for ext, t in ((".png", "image/png"), (".webp", "image/webp"), (".gif", "image/gif")):
+        if caminho.endswith(ext):
+            return t
+    return "image/jpeg"
+
+
 def _extrair_gemini(url):
     dados, tipo = _baixar(url)
-    if tipo in ("application/octet-stream", "text/plain"):
-        tipo = "image/jpeg"
-    if url.lower().endswith(".pdf"):
-        tipo = "application/pdf"
+    tipo = _tipo_da_imagem(url, tipo)
     corpo = json.dumps({
         "contents": [{"parts": [{"inline_data": {"mime_type": tipo, "data": base64.b64encode(dados).decode()}},
                                 {"text": PROMPT}]}],
@@ -153,7 +164,7 @@ def _extrair_gemini(url):
         req = urllib.request.Request(api, data=corpo, headers={"Content-Type": "application/json",
                                                                "x-goog-api-key": os.environ["GEMINI_API_KEY"]})
         try:
-            with urllib.request.urlopen(req, timeout=180) as r:
+            with urllib.request.urlopen(req, timeout=100) as r:
                 d = json.loads(r.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
             msg = e.read().decode("utf-8", "replace")
