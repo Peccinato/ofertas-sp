@@ -3,6 +3,7 @@ name: Publicar site
 on:
   schedule:
     - cron: "0 9 * * *"   # todo dia às 06:00 de São Paulo
+    - cron: "0 18 * * *"  # e às 15:00: tenta de novo os folhetos que a IA não leu de manhã
   workflow_dispatch:       # botão "Run workflow" para atualizar na hora
 
 permissions:

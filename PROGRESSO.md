@@ -7,6 +7,14 @@ sessão) retomar este trabalho, leia isto primeiro e continue daqui.
 
 ---
 
+## Segunda coleta no dia, 13/11/2026 (Claude)
+
+Pedido do dono. A IA (Gemini grátis) lê em média 16 páginas novas por dia e deixa uns 5 folhetos
+pendentes por coleta, quase sempre por demora ("timed out") ou 503. O `publicar.yml` ganhou um segundo
+horário: 15:00 de São Paulo (`0 18 * * *`), além do das 06:00. O dono preferiu ficar só no Google e não
+quis, por ora, mais modelos na fila nem nova tentativa em caso de demora.
+Backup: `backups/2026-11-13-segunda-coleta/`.
+
 ## Mercado 3M (folheto), 13/11/2026 (Claude)
 
 Pedido do dono. O Supermercado 3M tem duas lojas na zona sul de SP (R. Alberto Borges Soveral, 9 e
