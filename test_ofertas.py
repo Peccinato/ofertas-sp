@@ -532,6 +532,28 @@ class TestLeitorDeFolhetos(unittest.TestCase):
 
 class TestColetores(unittest.TestCase):
 
+    def test_folhetos_3m_pega_so_as_paginas_do_jornal(self):
+        """O site do 3M é do Wix: o jornal são imagens grandes e em pé; logo, ícone e faixa ficam de fora."""
+        from coletores import folhetos
+        wix = "https://static.wixstatic.com/media/"
+        pagina = (f'<img src="{wix}14df23_logo~mv2.png/v1/fill/w_150,h_150,al_c/180.png">'
+                  f'<img src="{wix}14df23_faixa~mv2.png/v1/fill/w_1440,h_342,q_90/faixa.png">'
+                  f'<img src="{wix}14df23_aaa~mv2.jpeg/v1/fill/w_900,h_1595,al_c,q_85/WhatsApp%20Image.jpeg">'
+                  f'<img src="{wix}14df23_aaa~mv2.jpeg/v1/fill/w_900,h_1595,al_c,q_85/WhatsApp%20Image.jpeg">'
+                  f'<img src="{wix}14df23_bbb~mv2.jpeg/v1/fill/w_900,h_1597,al_c,q_85/WhatsApp%20Image%20(1).jpeg">')
+        original = folhetos.http
+        folhetos.http = lambda url, *a, **k: pagina
+        try:
+            fs = folhetos.folhetos_3m()
+        finally:
+            folhetos.http = original
+        self.assertEqual([f["imagem"] for f in fs], [wix + "14df23_aaa~mv2.jpeg", wix + "14df23_bbb~mv2.jpeg"])
+        self.assertEqual([f["pagina"] for f in fs], [1, 2])
+        self.assertTrue(all(f["mercado"] == "3M" for f in fs))
+        from coletores.regioes import regiao_do_mercado, REGIOES
+        self.assertIn("3M", REGIOES["sp"]["folhetos"])
+        self.assertEqual(regiao_do_mercado("3M"), "sp")
+
     def test_pague_menos_usa_a_busca_vtex(self):
         """Em 11/2026 a loja trocou de plataforma e a busca antiga passou a dar 404."""
         from coletores import sites

@@ -434,7 +434,7 @@
 const CORES = {"Pão de Açúcar":"#b5121b","Tenda Atacado":"#e85d04","Atacadão":"#d62828","Sam's Club":"#0067a0",
   "Mambo":"#2b9348","Oba Hortifruti":"#6a994e","Coop":"#1d4e89","Savegnago":"#c1121f","Zaffari":"#7b2cbf",
   "Assaí":"#f77f00","Roldão":"#003f88","Sonda":"#e30613","Swift":"#c8102e","Akki":"#f4a300",
-  "Lopes":"#00843d","Max Atacadista":"#e4002b","Carrefour":"#1e5bc6","Barbosa":"#d71920","Extra":"#e2001a"};
+  "Lopes":"#00843d","Max Atacadista":"#e4002b","Carrefour":"#1e5bc6","Barbosa":"#d71920","Extra":"#e2001a","3M":"#2a6fb0"};
 const SUGESTOES = [["Arroz 5 kg","arroz 5kg"],["Feijão carioca 1 kg","feijão carioca 1kg"],["Café 500 g","café 500g"],["Leite integral","leite integral"],["Óleo de soja","óleo de soja"],
   ["Açúcar 5 kg","açúcar 5kg"],["Ovos","ovos"],["Cerveja em lata","cerveja lata"],["Papel higiênico","papel higiênico"],["Sabão em pó","sabão em pó"]];
 const $ = s => document.querySelector(s);
@@ -1643,7 +1643,8 @@ $("#modoLista").onclick = e => {
 // redes cujo nome no mapa não é o nome usado aqui: [o que buscar, como reconhecer o resultado (sem acento)]
 const NOME_NO_MAPA = {"Extra": ["Extra", /(^| )extra( |$)/], "Tenda Atacado": ["Tenda", /tenda/], "Oba Hortifruti": ["Oba", /(^| )oba( |$)/],
   "Sam's Club": ["Sam's Club", /sam.?s club/], "Pague Menos": ["Pague Menos", /pague ?menos/], "BOA": ["Boa Supermercado", /(^| )boa( |$)/],
-  "Lopes": ["Supermercado Lopes", /lopes/], "Barbosa": ["Barbosa Supermercados", /barbosa/]};
+  "Lopes": ["Supermercado Lopes", /lopes/], "Barbosa": ["Barbosa Supermercados", /barbosa/],
+  "3M": ["Supermercado 3M", /(^| )3 ?m( |$)/]};
 // nenhuma chamada da rota pode deixar a tela esperando para sempre
 const comPrazo = (url, opts = {}, ms = 12000) => { const c = new AbortController(), t = setTimeout(() => c.abort(), ms); return fetch(url, {...opts, signal: c.signal}).finally(() => clearTimeout(t)); };
 const pausa = ms => new Promise(r => setTimeout(r, ms));

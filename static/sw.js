@@ -10,7 +10,7 @@
  * O que NÃO é guardado: nada de 11 MB de catálogo. O offline é a lista, os favoritos e o preço
  * desses itens — alguns KB, que é o que cabe e o que importa dentro da loja.
  */
-const VERSAO = "ofertas-sp-v6";
+const VERSAO = "ofertas-sp-v7";
 const CASCA = ["./", "index.html", "manifest.json", "icone-192.png", "icone-512.png"];
 const MAX_API = 60;          // quantas respostas de API guardar
 const FILA_CHAVE = "ofertas-fila";

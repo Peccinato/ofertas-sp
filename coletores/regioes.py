@@ -6,7 +6,7 @@ REGIOES = {
         "cep": "01310100",
         "online": ["Pão de Açúcar", "Extra", "Carrefour", "Tenda Atacado", "Sonda", "Atacadão", "Sam's Club", "Mambo",
                    "Oba Hortifruti", "Coop", "Savegnago", "Zaffari", "Swift"],
-        "folhetos": ["Assaí", "Roldão", "Akki", "Lopes", "Max Atacadista", "Barbosa"],
+        "folhetos": ["Assaí", "Roldão", "Akki", "Lopes", "Max Atacadista", "Barbosa", "3M"],
     },
     "paulinia": {
         "nome": "SP - Paulínia",

@@ -208,11 +208,25 @@ def folhetos_barbosa():
     return out
 
 
+def folhetos_3m():
+    """Supermercado 3M (duas lojas na zona sul de SP): o site é do Wix e o jornal são imagens soltas na página.
+    Pega só as imagens grandes e em pé (o resto é logo e ícone) e usa o arquivo original, sem o corte do Wix."""
+    h = http("https://www.supermercado3m.com.br/jornal")
+    out, vistos = [], set()
+    for arq, larg, alt in re.findall(r"static\.wixstatic\.com/media/([\w.~-]+?\.(?:jpe?g|png|webp))/v1/fill/w_(\d+),h_(\d+)", h, re.I):
+        if arq in vistos or int(larg) < 500 or int(alt) <= int(larg):
+            continue
+        vistos.add(arq)
+        out.append(_folheto("3M", "Jornal de Ofertas", f"https://static.wixstatic.com/media/{arq}",
+                            pagina=len(out) + 1, loja="2 lojas"))
+    return out
+
+
 def todos_folhetos(loja_assai="Mooca", loja_assai_id=None):
     out, erros = [], {}
     for nome, f in (("Assaí", lambda: folhetos_assai(loja_assai, loja_assai_id)), ("Roldão", folhetos_roldao),
                     ("Akki", folhetos_akki), ("Lopes", folhetos_lopes), ("Max Atacadista", folhetos_max),
-                    ("Barbosa", folhetos_barbosa)):
+                    ("Barbosa", folhetos_barbosa), ("3M", folhetos_3m)):
         try:
             out += f()
         except Exception as e:  # uma rede fora do ar não derruba as outras

@@ -7,6 +7,17 @@ sessão) retomar este trabalho, leia isto primeiro e continue daqui.
 
 ---
 
+## Mercado 3M (folheto), 13/11/2026 (Claude)
+
+Pedido do dono. O Supermercado 3M tem duas lojas na zona sul de SP (R. Alberto Borges Soveral, 9 e
+R. Feitiço da Vila, 36) e não tem loja online: entra só por folheto, na região São Paulo.
+- `folhetos_3m` (coletores/folhetos.py): lê https://www.supermercado3m.com.br/jornal (site do Wix) e
+  pega as imagens grandes e em pé, no arquivo original. A página não dá validade.
+- "3M" em `REGIOES["sp"]["folhetos"]`, em `todos_folhetos`, na lista do app.py, em `CORES` e em
+  `NOME_NO_MAPA` (rota) do index.html. sw.js v7. Teste `test_folhetos_3m_pega_so_as_paginas_do_jornal`.
+- O Instagram (3m_supermercado) não é coletado: precisa de login.
+Backup: `backups/2026-11-13-mercado-3m/`.
+
 ## Aviso falso do Extra na busca ao vivo, 13/11/2026 (Claude)
 
 Na busca "arroz 5 kg" o site mostrava "Não responderam agora: Extra". O Extra tinha respondido 404
