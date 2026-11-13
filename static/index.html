@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0f7b4f">
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Ofertas SP">
@@ -12,59 +13,161 @@
 <title>Ofertas SP</title>
 <style>
   :root {
-    --bg: #f6f5f2; --card: #fff; --txt: #1d1d1b; --sub: #6b6b66; --linha: #e6e4de;
-    --acento: #0f7b4f; --acento-2: #e7f4ed; --verm: #c2410c; --verm-2: #fdece3; --raio: 12px;
+    --bg: #f2f2f7; --card: #fff; --txt: #1c1c1e; --sub: #6e6e73; --linha: #e5e5ea; --campo: #e4e4ea;
+    --acento: #0a8f5b; --acento-2: #e2f5ec; --sobre-acento: #fff; --verm: #c2410c; --verm-2: #fdece3;
+    --barra: rgba(249,249,251,.9); --raio: 14px; --nav: 58px;
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #151514; --card: #1f1f1d; --txt: #ecebe7; --sub: #a3a29c; --linha: #33322f;
-            --acento: #4ec38d; --acento-2: #1c3328; --verm: #fb8a4c; --verm-2: #3a2418; }
+    :root { --bg: #000; --card: #1c1c1e; --txt: #f5f5f7; --sub: #98989f; --linha: #2c2c2e; --campo: #1c1c1e;
+            --acento: #30d28a; --acento-2: #0f3324; --sobre-acento: #002b17; --verm: #fb8a4c; --verm-2: #3a2418;
+            --barra: rgba(22,22,24,.9); }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--txt); }
-  header { position: sticky; top: 0; z-index: 5; background: var(--card); border-bottom: 1px solid var(--linha); }
-  .topo { max-width: 1100px; margin: 0 auto; padding: 12px 16px 0; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-  h1 { font-size: 19px; margin: 0; letter-spacing: -.01em; }
-  h1 span { color: var(--acento); }
-  nav { max-width: 1100px; margin: 0 auto; padding: 0 16px; display: flex; gap: 4px; }
-  nav button { background: none; border: 0; border-bottom: 3px solid transparent; padding: 10px 12px; font: inherit; color: var(--sub); cursor: pointer; }
-  nav button.ativo { color: var(--txt); border-color: var(--acento); font-weight: 600; }
-  main { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  [hidden] { display: none !important; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; font: 15px/1.4 -apple-system, system-ui, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--txt);
+         padding-bottom: calc(var(--nav) + env(safe-area-inset-bottom) + 16px); -webkit-tap-highlight-color: transparent; }
+  a { color: var(--acento); }
+  header, main { max-width: 760px; margin: 0 auto; }
+  header { padding: 14px 16px 0; }
+  .topo { display: flex; align-items: center; gap: 10px; justify-content: space-between; min-height: 22px; }
+  .cep { font: inherit; font-size: 13px; font-weight: 600; padding: 0; border: 0; background: none; color: var(--acento); cursor: pointer; text-align: left; }
+  .cep::after { content: " trocar"; color: var(--sub); font-weight: 400; }
+  .cep.vazio-cep { color: var(--verm); } .cep.vazio-cep::after { content: ""; }
+  #resumo { color: var(--sub); font-size: 12px; white-space: nowrap; }
+  h1 { font-size: 30px; font-weight: 750; margin: 2px 0 0; letter-spacing: -.03em; }
+  main { padding: 10px 16px 16px; }
   .painel { display: none; } .painel.ativo { display: block; }
-  .barra { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
-  input[type=search], select { font: inherit; padding: 10px 12px; border: 1px solid var(--linha); border-radius: 10px; background: var(--card); color: var(--txt); }
-  input[type=search] { flex: 1; min-width: 200px; }
-  button.btn { font: inherit; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--acento); background: var(--acento); color: #fff; cursor: pointer; font-weight: 600; }
-  button.btn.sec { background: var(--card); color: var(--acento); }
+  .voltar { font: inherit; font-weight: 600; color: var(--acento); background: none; border: 0; padding: 0 0 8px; cursor: pointer; }
+
+  /* navegação: abas embaixo no celular, barra lateral no computador */
+  nav { position: fixed; z-index: 6; left: 0; right: 0; bottom: 0; display: flex; background: var(--barra); border-top: 1px solid var(--linha);
+        padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); backdrop-filter: saturate(180%) blur(18px); -webkit-backdrop-filter: saturate(180%) blur(18px); }
+  nav .marca { display: none; }
+  nav button { flex: 1; background: none; border: 0; padding: 2px 0; font: inherit; font-size: 10.5px; font-weight: 500; color: var(--sub); cursor: pointer; position: relative; }
+  nav button svg { display: block; margin: 0 auto 2px; width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  nav button.ativo { color: var(--acento); font-weight: 600; }
+  nav button .n:not(:empty) { position: absolute; top: -2px; left: calc(50% + 6px); min-width: 17px; height: 17px; padding: 0 5px; border-radius: 99px;
+        background: var(--acento); color: var(--sobre-acento); font-size: 10.5px; font-weight: 700; line-height: 17px; }
+  @media (min-width: 900px) {
+    body { padding-bottom: 24px; padding-left: 216px; }
+    nav { top: 0; right: auto; width: 216px; flex-direction: column; gap: 2px; padding: 18px 10px; border-top: 0; border-right: 1px solid var(--linha); }
+    nav .marca { display: block; font-size: 19px; font-weight: 750; letter-spacing: -.02em; padding: 0 10px 14px; }
+    nav .marca span { color: var(--acento); }
+    nav button { flex: none; display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; font-size: 14.5px; text-align: left; }
+    nav button svg { margin: 0; width: 21px; height: 21px; }
+    nav button.ativo { background: var(--acento-2); }
+    nav button .n:not(:empty) { position: static; margin-left: auto; }
+  }
+
+  /* campos e botões */
+  .barra { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+  input[type=search], input[type=number], select, dialog input { font: inherit; padding: 10px 12px; border: 0; border-radius: 12px; background: var(--campo); color: var(--txt); min-width: 0; }
+  input[type=search] { flex: 1; min-width: 150px; -webkit-appearance: none; appearance: none; }
+  input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--acento); outline-offset: 1px; }
+  select { padding-right: 8px; max-width: 100%; }
+  button.btn { font: inherit; padding: 10px 14px; border-radius: 12px; border: 0; background: var(--acento); color: var(--sobre-acento); cursor: pointer; font-weight: 600; }
+  button.btn.sec { background: var(--card); color: var(--acento); font-weight: 500; }
   button.btn:disabled { opacity: .5; cursor: default; }
-  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
-  .chip { font: inherit; font-size: 13px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--linha); background: var(--card); color: var(--txt); cursor: pointer; }
-  .chip.off { opacity: .4; text-decoration: line-through; }
-  .chip .n { color: var(--sub); margin-left: 4px; }
-  .info { color: var(--sub); font-size: 13px; margin: 6px 0 12px; }
-  .aviso { background: var(--verm-2); color: var(--verm); padding: 10px 12px; border-radius: 10px; font-size: 13px; margin-bottom: 12px; }
-  .lista { display: grid; gap: 8px; }
-  .item { display: grid; grid-template-columns: 56px 1fr auto; gap: 12px; align-items: center; background: var(--card); border: 1px solid var(--linha); border-radius: var(--raio); padding: 10px 12px; }
-  .item img { width: 56px; height: 56px; object-fit: contain; border-radius: 8px; background: #fff; }
-  .item .nome { font-weight: 500; }
-  .item .nome a { color: inherit; text-decoration: none; } .item .nome a:hover { text-decoration: underline; }
-  .meta { font-size: 12.5px; color: var(--sub); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 3px; }
-  .tag { display: inline-block; font-size: 11.5px; font-weight: 600; padding: 2px 7px; border-radius: 6px; color: #fff; }
+  .chips { display: flex; gap: 6px; margin: 0 -16px 10px; padding: 0 16px; overflow-x: auto; scrollbar-width: none; }
+  .chips::-webkit-scrollbar { display: none; } .chips:empty { display: none; }
+  .chip { font: inherit; font-size: 13px; padding: 6px 12px; border-radius: 999px; border: 0; background: var(--card); color: var(--txt); cursor: pointer; white-space: nowrap; flex: none; }
+  .chip i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .chip.off { opacity: .45; }
+  .chip.sel { background: var(--acento); color: var(--sobre-acento); font-weight: 600; }
+  .chip .n { opacity: .65; margin-left: 5px; }
+  .info { color: var(--sub); font-size: 13px; margin: 4px 2px 10px; }
+  .linha-info { display: flex; align-items: center; gap: 10px; justify-content: space-between; margin: 2px 2px 8px; }
+  .linha-info .info { margin: 0; }
+  .linha-info select { background: none; color: var(--acento); font-weight: 600; font-size: 13px; padding: 4px 0; text-align: right; cursor: pointer; }
+  .aviso { background: var(--verm-2); color: var(--verm); padding: 10px 12px; border-radius: 12px; font-size: 13px; margin-bottom: 10px; }
+  .sub { color: var(--sub); font-size: 13px; }
+  h2 { font-size: 12.5px; font-weight: 500; text-transform: uppercase; letter-spacing: .05em; color: var(--sub); margin: 22px 4px 7px; }
+
+  /* listas agrupadas: linhas dentro de um cartão, separadas por um fio */
+  .lista { background: var(--card); border-radius: var(--raio); overflow: hidden; }
+  .lista:empty { display: none; }
+  .lista > * + * { border-top: 1px solid var(--linha); }
+  .item { display: flex; flex-wrap: wrap; gap: 4px 11px; align-items: center; padding: 10px 12px; cursor: pointer; }
+  .item > img { width: 46px; height: 46px; object-fit: contain; border-radius: 10px; background: #fff; flex: none; }
+  .corpo-item { flex: 1 1 0; min-width: 0; }
+  .item .nome { font-weight: 600; font-size: 14px; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .item.aberto .nome { -webkit-line-clamp: unset; }
+  .meta { font-size: 12.5px; color: var(--sub); display: flex; gap: 3px 7px; flex-wrap: wrap; align-items: center; margin-top: 2px; }
+  .merc { white-space: nowrap; } .merc i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 6px; color: #fff; white-space: nowrap; }
   .tag.desc { background: var(--verm-2); color: var(--verm); }
-  .tag.fol { background: var(--acento-2); color: var(--acento); }
-  .preco { text-align: right; white-space: nowrap; }
-  .preco b { font-size: 18px; } .preco s { color: var(--sub); font-size: 12.5px; display: block; }
-  .preco small { color: var(--sub); display: block; font-size: 12px; }
-  .item.top { border-color: var(--acento); box-shadow: 0 0 0 1px var(--acento) inset; }
-  .grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
-  .grupo-fol { margin-bottom: 28px; }
-  .grupo-fol > header { position: static; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; background: none; border: 0;
-                        border-left: 5px solid var(--cor); padding: 4px 0 4px 10px; margin-bottom: 12px; }
-  .grupo-fol h3 { margin: 0; font-size: 17px; }
+  .tag.fol, .tag.real { background: var(--acento-2); color: var(--acento); }
+  .tag.falsa { background: var(--verm-2); color: var(--verm); }
+  .tag.cara { background: #fff3cd; color: #8a6100; }
+  @media (prefers-color-scheme: dark) { .tag.cara { background: #3a2f10; color: #e8c26a; } }
+  .preco { text-align: right; white-space: nowrap; flex: none; }
+  .preco b { font-size: 16.5px; font-weight: 700; letter-spacing: -.01em; display: block; }
+  .preco s { color: var(--sub); font-size: 12px; display: block; } .preco small { color: var(--sub); display: block; font-size: 11.5px; }
+  .acoes { flex: none; }
+  .acao { font: inherit; font-size: 19px; line-height: 1; width: 32px; height: 32px; border-radius: 50%; border: 0; background: var(--acento-2); color: var(--acento); cursor: pointer; font-weight: 600; }
+  .acao.ok { background: var(--acento); color: var(--sobre-acento); font-size: 15px; }
+  .detalhe { display: none; flex: 1 1 100%; padding: 6px 0 2px; cursor: default; }
+  .item.aberto .detalhe { display: block; }
+  .detalhe .botoes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .detalhe .botoes > * { font: inherit; font-size: 13.5px; font-weight: 600; padding: 7px 12px; border-radius: 99px; border: 0; background: var(--bg); color: var(--acento); cursor: pointer; text-decoration: none; }
+  .detalhe .botoes .on { color: #c98a00; }
+  .detalhe .outros { margin-top: 10px; font-size: 13px; }
+  .detalhe .outros div { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-top: 1px solid var(--linha); }
+  .detalhe .sem-hist { font-size: 12.5px; color: var(--sub); }
+  .hist svg { display: block; width: 100%; height: 64px; }
+  .hist .eixo { display: flex; justify-content: space-between; font-size: 11px; color: var(--sub); }
+  .hist .nums { font-size: 12px; color: var(--sub); margin-top: 2px; }
+  .vazio { text-align: center; color: var(--sub); padding: 40px 0; }
+  .fav-alt { font-size: 12.5px; margin-top: 4px; color: var(--acento); } .fav-alt.pior { color: var(--sub); }
+  .var-up { color: var(--verm); font-size: 12px; } .var-down { color: var(--acento); font-size: 12px; }
+
+  /* segmentos (região, modo da lista) */
+  .seg { display: flex; background: var(--campo); border-radius: 10px; padding: 2px; margin-bottom: 10px; }
+  .seg:empty { display: none; }
+  .seg button { flex: 1; font: inherit; font-size: 13px; padding: 7px 10px; border: 0; border-radius: 8px; background: none; color: var(--sub); cursor: pointer; }
+  .seg button.ativo { background: var(--card); color: var(--txt); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.14); }
+  @media (prefers-color-scheme: dark) { .seg button.ativo { background: #3a3a3c; } }
+
+  /* tela Mais: linhas de ajuste */
+  .linha { display: flex; align-items: center; gap: 10px; padding: 12px 14px; width: 100%; font: inherit; color: inherit; background: none; border: 0; text-align: left; cursor: pointer; }
+  .linha .rot { flex: 1; min-width: 0; font-weight: 500; } .linha .rot small { display: block; font-weight: 400; color: var(--sub); font-size: 12.5px; }
+  .linha .seta { color: var(--sub); }
+  .chave { appearance: none; -webkit-appearance: none; width: 46px; height: 28px; border-radius: 99px; background: var(--linha); position: relative; flex: none; cursor: pointer; margin: 0; transition: background .15s; }
+  .chave::after { content: ""; position: absolute; top: 2px; left: 2px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: left .15s; }
+  .chave:checked { background: var(--acento); } .chave:checked::after { left: 20px; }
+
+  /* lista de compras */
+  .resumo-lista { background: var(--acento); color: var(--sobre-acento); border-radius: var(--raio); padding: 12px 14px; margin-bottom: 10px; }
+  .resumo-lista small { display: block; font-size: 12.5px; opacity: .9; } .resumo-lista b { font-size: 25px; letter-spacing: -.02em; display: block; }
+  .secao-lista { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 9px 14px 7px; font-size: 13px; color: var(--sub); background: var(--bg); }
+  .secao-lista b { color: var(--txt); } .secao-lista i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .linha-lista { display: grid; grid-template-columns: auto 1fr auto auto; gap: 10px; align-items: center; padding: 10px 12px; }
+  .linha-lista.feito { opacity: .5; } .linha-lista.feito .txt { text-decoration: line-through; }
+  .linha-lista input[type=number] { width: 52px; padding: 6px 6px; text-align: center; border-radius: 8px; background: var(--bg); }
+  .linha-lista input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--acento); }
+  .linha-lista .txt { font-weight: 600; font-size: 14px; } .linha-lista .onde { font-size: 12.5px; color: var(--sub); margin-top: 2px; }
+  .linha-lista .del { font: inherit; background: none; border: 0; color: var(--sub); font-size: 15px; padding: 6px; cursor: pointer; }
+  .linha-lista .lado { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+  .totais { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; margin: 0 0 14px; }
+  .total { background: var(--card); border-radius: var(--raio); padding: 10px 12px; }
+  .total b { font-size: 17px; display: block; } .total.melhor { box-shadow: 0 0 0 2px var(--acento) inset; }
+  .total .sub { display: block; font-size: 12px; }
+  /* modo mercado: letras grandes, para usar andando */
+  body.modo-mercado .linha-lista { padding: 16px 14px; }
+  body.modo-mercado .linha-lista .txt { font-size: 21px; font-weight: 700; }
+  body.modo-mercado .linha-lista input[type=checkbox] { width: 30px; height: 30px; }
+  body.modo-mercado .linha-lista .onde, body.modo-mercado .linha-lista .lado, body.modo-mercado header, body.modo-mercado nav,
+  body.modo-mercado #formLista, body.modo-mercado #modoLista, body.modo-mercado #resumoLista, body.modo-mercado #tituloTotais,
+  body.modo-mercado #infoTotais, body.modo-mercado #totais, body.modo-mercado .so-fora-do-mercado { display: none; }
+
+  /* folhetos */
+  .grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+  .grupo-fol { margin-bottom: 26px; }
+  .grupo-fol > header { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 0 2px; margin-bottom: 10px; max-width: none; }
   .grupo-fol .resumo-grupo { color: var(--sub); font-size: 13px; }
-  .grupo-fol .ver-produtos { margin-left: auto; font: inherit; font-size: 13px; padding: 6px 10px; border-radius: 8px;
-                             border: 1px solid var(--linha); background: var(--card); color: var(--acento); cursor: pointer; }
-  .chip.sel { border-color: var(--acento); color: var(--acento); font-weight: 600; }
-  .folheto { background: var(--card); border: 1px solid var(--linha); border-radius: var(--raio); overflow: hidden; }
+  .grupo-fol .ver-produtos { margin-left: auto; font: inherit; font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 99px; border: 0; background: var(--card); color: var(--acento); cursor: pointer; }
+  .folheto { background: var(--card); border-radius: var(--raio); overflow: hidden; }
   .folheto img { width: 100%; aspect-ratio: 3/4; object-fit: cover; object-position: top; display: block; background: #fff; }
   .folheto > div { padding: 8px 10px; font-size: 13px; }
   .folheto .pdf { aspect-ratio: 3/4; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
@@ -73,110 +176,56 @@
   .folheto a { color: inherit; text-decoration: none; }
   .progresso { height: 6px; background: var(--linha); border-radius: 3px; overflow: hidden; margin: 8px 0; }
   .progresso i { display: block; height: 100%; background: var(--acento); width: 0; transition: width .4s; }
-  .vazio { text-align: center; color: var(--sub); padding: 40px 0; }
-  /* ações do item: favoritar e pôr na lista */
-  .item { grid-template-columns: 56px 1fr auto auto; }
-  .acoes { display: flex; flex-direction: column; gap: 4px; }
-  .acao { font: inherit; font-size: 17px; line-height: 1; width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--linha);
-          background: var(--card); color: var(--sub); cursor: pointer; }
-  .acao.on { color: #e0a100; border-color: #e0a100; }
-  .acao.ok { color: var(--acento); border-color: var(--acento); }
-  .seg { display: inline-flex; border: 1px solid var(--linha); border-radius: 999px; overflow: hidden; margin-left: auto; }
-  .seg:empty { display: none; }
-  .seg button { font: inherit; font-size: 13px; padding: 6px 12px; border: 0; background: var(--card); color: var(--sub); cursor: pointer; }
-  .seg button.ativo { background: var(--acento); color: #fff; font-weight: 600; }
-  .cep { font: inherit; font-size: 13px; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--linha);
-         background: var(--card); color: var(--txt); cursor: pointer; }
-  .cep.vazio-cep { border-color: var(--verm); color: var(--verm); }
-  dialog { border: 1px solid var(--linha); border-radius: var(--raio); background: var(--card); color: var(--txt); padding: 18px; width: min(420px, calc(100vw - 32px)); }
-  dialog::backdrop { background: rgba(0,0,0,.4); }
-  dialog h3 { margin: 0 0 6px; } dialog input { width: 100%; font-size: 18px; letter-spacing: .05em; margin: 10px 0; }
-  .sub { color: var(--sub); font-size: 13px; }
-  .resumo-cep { margin-top: 10px; font-size: 13px; color: var(--sub); }
-  /* favoritos */
-  .fav-alt { font-size: 12.5px; margin-top: 4px; color: var(--acento); }
-  .fav-alt.pior { color: var(--sub); }
-  .var-up { color: var(--verm); font-size: 12px; } .var-down { color: var(--acento); font-size: 12px; }
-  /* histórico de preços e veredito da promoção */
-  .tag.real { background: var(--acento-2); color: var(--acento); }
-  .tag.falsa { background: var(--verm-2); color: var(--verm); }
-  .tag.cara { background: #fff3cd; color: #8a6100; }
-  @media (prefers-color-scheme: dark) { .tag.cara { background: #3a2f10; color: #e8c26a; } }
-  .hist { margin-top: 6px; }
-  .hist svg { display: block; width: 100%; height: 64px; }
-  .hist .eixo { display: flex; justify-content: space-between; font-size: 11px; color: var(--sub); }
-  .hist .nums { font-size: 12px; color: var(--sub); margin-top: 2px; }
+
   /* família e alertas */
-  .codigo-familia { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 19px; letter-spacing: .12em;
-                    font-weight: 700; background: var(--acento-2); color: var(--acento); padding: 8px 12px;
-                    border-radius: 10px; display: inline-block; user-select: all; }
-  .linha-alerta { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center;
-                  background: var(--card); border: 1px solid var(--linha); border-radius: var(--raio); padding: 10px 12px; }
-  .linha-alerta .alvo { font-weight: 700; }
-  .linha-alerta.off { opacity: .5; }
+  .codigo-familia { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 19px; letter-spacing: .12em; font-weight: 700;
+                    background: var(--acento-2); color: var(--acento); padding: 8px 12px; border-radius: 10px; display: inline-block; user-select: all; }
+  .linha-alerta { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 10px 12px; }
+  .linha-alerta .alvo { font-weight: 700; } .linha-alerta.off { opacity: .5; }
   .saude { display: grid; gap: 6px; font-size: 13px; }
   .saude .ok { color: var(--acento); } .saude .ruim { color: var(--verm); }
-  /* modo mercado: letras grandes, para usar andando */
-  body.modo-mercado .linha-lista { padding: 16px 14px; }
-  body.modo-mercado .linha-lista .txt { font-size: 21px; font-weight: 700; }
-  body.modo-mercado .linha-lista input[type=checkbox] { width: 30px; height: 30px; }
-  body.modo-mercado .linha-lista .onde, body.modo-mercado .linha-lista .valor { display: none; }
-  body.modo-mercado header, body.modo-mercado #formLista, body.modo-mercado .barra-lista { display: none; }
-  .corredor { font-size: 13px; font-weight: 700; color: var(--sub); text-transform: uppercase;
-              letter-spacing: .08em; margin: 16px 0 4px; }
-  /* lista de compras */
-  .linha-lista { display: grid; grid-template-columns: auto 64px 1fr auto auto; gap: 10px; align-items: center; background: var(--card);
-                 border: 1px solid var(--linha); border-radius: var(--raio); padding: 10px 12px; }
-  .linha-lista.feito { opacity: .5; } .linha-lista.feito .txt { text-decoration: line-through; }
-  .linha-lista input[type=number] { width: 64px; font: inherit; padding: 6px 8px; border: 1px solid var(--linha); border-radius: 8px; background: var(--card); color: var(--txt); }
-  .linha-lista input[type=checkbox] { width: 20px; height: 20px; accent-color: var(--acento); }
-  .linha-lista .txt { font-weight: 500; } .linha-lista .onde { font-size: 12.5px; color: var(--sub); margin-top: 2px; }
-  .totais { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; margin: 14px 0; }
-  .total { background: var(--card); border: 1px solid var(--linha); border-radius: var(--raio); padding: 10px 12px; }
-  .total b { font-size: 18px; display: block; } .total.melhor { border-color: var(--acento); box-shadow: 0 0 0 1px var(--acento) inset; }
-  .total .sub { display: block; }
-  h2 { font-size: 15px; margin: 18px 0 8px; }
+
+  dialog { border: 0; border-radius: 20px; background: var(--card); color: var(--txt); padding: 20px; width: min(420px, calc(100vw - 32px)); }
+  dialog::backdrop { background: rgba(0,0,0,.45); }
+  dialog h3 { margin: 0 0 6px; } dialog input { width: 100%; font-size: 18px; letter-spacing: .05em; margin: 12px 0; background: var(--bg); }
+  .resumo-cep { margin-top: 12px; font-size: 13px; color: var(--sub); }
   /* versão online: sem coleta pelo navegador */
   .estatico #btnAtualOf, .estatico #btnAtualFol, .estatico #btnLerFol, .estatico #btnAtualFav, .estatico #lojaAssai,
   .estatico #lblAssai, .estatico #avisoIA, .estatico #refazer, .sem-proxy #btnCepSalvar, .sem-proxy #inpCep { display: none !important; }
-  @media (max-width: 560px) {
-    .item { grid-template-columns: 44px 1fr auto; } .item img { width: 44px; height: 44px; }
-    .preco { grid-column: 2; text-align: left; } .acoes { grid-row: 1 / span 2; grid-column: 3; }
-    .linha-lista { grid-template-columns: auto 56px 1fr auto; } .linha-lista .valor { grid-column: 3; }
-    nav { overflow-x: auto; } nav button { white-space: nowrap; }
-    .grade { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-  }
+  @media (max-width: 420px) { .grade { grid-template-columns: repeat(2, 1fr); } }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
 <body>
 <header>
-  <div class="topo"><h1>Ofertas <span>SP</span></h1><span class="info" id="resumo" style="margin:0"></span>
-    <div class="seg" id="regioes" role="tablist" aria-label="Região"></div>
-    <button class="cep vazio-cep" id="btnCep" type="button">📍 Informe seu CEP</button></div>
-  <nav>
-    <button class="ativo" data-aba="comparar">Comparar preços</button>
-    <button data-aba="ofertas">Ofertas</button>
-    <button data-aba="favoritos">★ Favoritos <span id="nFav"></span></button>
-    <button data-aba="lista">🛒 Lista <span id="nLista"></span></button>
-    <button data-aba="familia">👨‍👩‍👧 Família</button>
-    <button data-aba="folhetos">Folhetos</button>
-  </nav>
+  <div class="topo"><button class="cep vazio-cep" id="btnCep" type="button">Informe seu CEP</button><span id="resumo"></span></div>
+  <h1 id="titulo">Comparar</h1>
 </header>
+<nav aria-label="Seções">
+  <div class="marca">Ofertas <span>SP</span></div>
+  <button class="ativo" data-aba="comparar" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>Comparar</button>
+  <button data-aba="ofertas" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 13.5l-7 7a1.5 1.5 0 0 1-2.1 0L3 12V3h9l8.5 8.4a1.5 1.5 0 0 1 0 2.1z"/><circle cx="7.5" cy="7.5" r="1.2"/></svg>Ofertas</button>
+  <button data-aba="favoritos" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.8-4.5 4.2 1.1 6-5.4-3-5.4 3 1.1-6L3.2 9.4l6.1-.8z"/></svg>Favoritos<span class="n" id="nFav"></span></button>
+  <button data-aba="lista" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 4h2.5l2.2 11.5h10.6L20.5 8H7"/><circle cx="9" cy="19.5" r="1.2"/><circle cx="17" cy="19.5" r="1.2"/></svg>Lista<span class="n" id="nLista"></span></button>
+  <button data-aba="mais" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg>Mais</button>
+</nav>
 <main>
   <!-- COMPARAR -->
   <section class="painel ativo" id="comparar">
     <form class="barra" id="formBusca">
-      <input type="search" id="q" placeholder="Ex.: arroz 5kg, café pilão 500g, leite integral" autofocus>
-      <select id="ordem">
-        <option value="unidade">Menor preço por kg/L</option>
-        <option value="preco">Menor preço</option>
-      </select>
+      <input type="search" id="q" placeholder="Buscar: arroz 5kg, café 500g, leite…" enterkeyhint="search">
       <button class="btn">Buscar</button>
     </form>
     <div class="chips" id="sugestoes"></div>
     <div class="chips" id="filtroMercados"></div>
     <div id="avisoBusca"></div>
-    <div class="info" id="infoBusca">Busca nas lojas online de várias redes e nos folhetos já lidos.</div>
+    <div class="linha-info">
+      <div class="info" id="infoBusca">Busca nas lojas online de várias redes e nos folhetos já lidos.</div>
+      <select id="ordem" aria-label="Ordenar" hidden>
+        <option value="unidade">Menor por kg/L</option>
+        <option value="preco">Menor preço</option>
+      </select>
+    </div>
     <div class="lista" id="resultado"></div>
   </section>
 
@@ -184,10 +233,12 @@
   <section class="painel" id="ofertas">
     <div class="barra">
       <input type="search" id="qOf" placeholder="Filtrar ofertas…">
-      <select id="mercadoOf"><option value="">Todos os mercados</option></select>
-      <select id="origemOf"><option value="">Site + folheto</option><option value="site">Só sites</option><option value="folheto">Só folhetos</option></select>
-      <select id="ordemOf"><option value="desconto">Maior desconto</option><option value="unidade">Menor preço por kg/L</option><option value="preco">Menor preço</option></select>
       <button class="btn sec" id="btnAtualOf">Atualizar ofertas</button>
+    </div>
+    <div class="barra">
+      <select id="mercadoOf" aria-label="Mercado"><option value="">Todos os mercados</option></select>
+      <select id="origemOf" aria-label="Origem"><option value="">Site + folheto</option><option value="site">Só sites</option><option value="folheto">Só folhetos</option></select>
+      <select id="ordemOf" aria-label="Ordenar"><option value="desconto">Maior desconto</option><option value="unidade">Menor por kg/L</option><option value="preco">Menor preço</option></select>
     </div>
     <div id="progOf"></div>
     <div class="info" id="infoOf"></div>
@@ -197,7 +248,7 @@
   <!-- FAVORITOS -->
   <section class="painel" id="favoritos">
     <div class="barra">
-      <select id="ordemFav"><option value="nome">Ordem: nome</option><option value="oferta">Em oferta primeiro</option><option value="mercado">Por mercado</option></select>
+      <select id="ordemFav" aria-label="Ordenar"><option value="nome">Ordem: nome</option><option value="oferta">Em oferta primeiro</option><option value="mercado">Por mercado</option></select>
       <button class="btn sec" id="btnAtualFav">Atualizar preços dos favoritos</button>
     </div>
     <div id="progFav"></div>
@@ -208,25 +259,52 @@
   <!-- LISTA DE COMPRAS -->
   <section class="painel" id="lista">
     <form class="barra" id="formLista">
-      <input type="search" id="novoItem" placeholder="Adicionar item (ex.: arroz 5kg, leite integral 1L)">
-      <input type="number" id="novaQtd" value="1" min="1" style="width:70px;font:inherit;padding:10px;border:1px solid var(--linha);border-radius:10px;background:var(--card);color:var(--txt)">
-      <button class="btn">Adicionar</button>
+      <input type="search" id="novoItem" placeholder="Adicionar: arroz 5kg, leite 1L…" enterkeyhint="done">
+      <input type="number" id="novaQtd" value="1" min="1" aria-label="Quantidade" style="width:58px;text-align:center">
+      <button class="btn" aria-label="Adicionar">+</button>
     </form>
-    <div class="barra">
-      <button class="btn sec" id="btnCalcLista" type="button">Recalcular preços</button>
-      <button class="btn sec" id="btnLimparFeitos" type="button">Remover itens marcados</button>
-      <button class="btn sec" id="btnModoMercado" type="button">Modo mercado</button>
-      <button class="btn sec" id="btnWhatsapp" type="button">Mandar no WhatsApp</button>
+    <div class="seg" id="modoLista" role="tablist" aria-label="Como comprar">
+      <button type="button" role="tab" data-modo="um">Um mercado só</button>
+      <button type="button" role="tab" data-modo="dois">Dividir em 2</button>
     </div>
+    <div id="resumoLista"></div>
     <div class="info" id="infoLista"></div>
     <div class="lista" id="itensLista"></div>
+    <div class="chips" style="margin-top:12px">
+      <button class="chip" id="btnModoMercado" type="button">Modo mercado</button>
+      <button class="chip so-fora-do-mercado" id="btnWhatsapp" type="button">Mandar no WhatsApp</button>
+      <button class="chip so-fora-do-mercado" id="btnCalcLista" type="button">Recalcular preços</button>
+      <button class="chip so-fora-do-mercado" id="btnLimparFeitos" type="button">Remover marcados</button>
+    </div>
     <h2 id="tituloTotais" hidden>Quanto sai em cada mercado</h2>
     <div class="info" id="infoTotais"></div>
     <div class="totais" id="totais"></div>
   </section>
 
+  <!-- MAIS -->
+  <section class="painel" id="mais">
+    <h2 style="margin-top:6px">Meus mercados</h2>
+    <div class="lista" id="meusMercados"></div>
+    <div class="info" id="infoMercados">Só os mercados ligados entram na busca, nas ofertas e na lista.</div>
+
+    <h2>Região</h2>
+    <div class="seg" id="regioes" role="tablist" aria-label="Região"></div>
+    <div class="lista">
+      <button class="linha" id="linhaCep" type="button"><span class="rot">CEP<small id="rotCep">não informado</small></span><span class="seta">trocar ›</span></button>
+    </div>
+
+    <h2>Outros</h2>
+    <div class="lista">
+      <button class="linha" data-ir="folhetos" type="button"><span class="rot">Folhetos<small>As páginas dos tabloides de cada mercado</small></span><span class="seta">›</span></button>
+      <button class="linha" data-ir="familia" type="button"><span class="rot">Família<small>Lista compartilhada e alertas de preço</small></span><span class="seta">›</span></button>
+      <button class="linha" id="linhaInstalar" type="button"><span class="rot">Instalar no celular<small id="rotInstalar">Abre como um aplicativo, direto da tela inicial</small></span><span class="seta">›</span></button>
+    </div>
+    <div class="info" id="infoColeta" style="margin-top:14px"></div>
+  </section>
+
   <!-- FOLHETOS -->
   <section class="painel" id="folhetos">
+    <button class="voltar" data-ir="mais" type="button">‹ Mais</button>
     <div class="barra">
       <label class="info" id="lblAssai" style="margin:0">Loja Assaí:</label>
       <select id="lojaAssai"></select>
@@ -242,7 +320,8 @@
 
   <!-- FAMÍLIA -->
   <section class="painel" id="familia">
-    <h2>Lista compartilhada</h2>
+    <button class="voltar" data-ir="mais" type="button">‹ Mais</button>
+    <h2 style="margin-top:4px">Lista compartilhada</h2>
     <div class="info" id="infoFamilia">Entre com o código da família para todo mundo ver e editar a mesma lista e os mesmos favoritos.</div>
     <div class="barra">
       <input type="search" id="codigoFamilia" placeholder="Código da família (ex.: K7M2QX9PBR4T)" autocomplete="off" spellcheck="false" style="text-transform:uppercase;letter-spacing:.08em">
@@ -257,7 +336,7 @@
     <div id="estadoTelegram"></div>
     <form class="barra" id="formAlerta">
       <input type="search" id="alertaProduto" placeholder="Produto (ex.: café pilão 500g)" required>
-      <input type="number" id="alertaAlvo" placeholder="Alvo R$" step="0.01" min="0.01" required style="width:120px;font:inherit;padding:10px;border:1px solid var(--linha);border-radius:10px;background:var(--card);color:var(--txt)">
+      <input type="number" id="alertaAlvo" placeholder="Alvo R$" step="0.01" min="0.01" required style="width:110px">
       <button class="btn" type="submit">Criar alerta</button>
     </form>
     <div class="barra">
@@ -276,7 +355,7 @@
 
 <dialog id="dlgCep">
   <form method="dialog" id="formCep">
-    <h3>📍 Seu CEP</h3>
+    <h3>Seu CEP</h3>
     <div class="sub">Os preços e a disponibilidade das lojas online mudam conforme a região. O CEP também escolhe o Assaí mais perto de você.</div>
     <input id="inpCep" inputmode="numeric" placeholder="00000-000" maxlength="9" autocomplete="postal-code">
     <div id="erroCep" class="aviso" hidden></div>
@@ -309,7 +388,9 @@ const Regiao = {
   atual: (() => { try { return localStorage.getItem("ofertas-regiao") || "sp"; } catch { return "sp"; } })(),
   def() { return this.lista[this.atual] || {online: [], folhetos: []}; },
   redes() { const r = this.def(); return new Set([...(r.online || []), ...(r.folhetos || [])]); },
-  tem(m) { return !Object.keys(this.lista).length || this.redes().has(m); },
+  // "Meus mercados": o que o usuário desligou não entra em busca, ofertas, folhetos nem lista
+  desligados: (() => { try { return new Set(JSON.parse(localStorage.getItem("ofertas-mercados-off") || "[]")); } catch { return new Set(); } })(),
+  tem(m) { return (!Object.keys(this.lista).length || this.redes().has(m)) && !this.desligados.has(m); },
 };
 
 const Estatico = {
@@ -575,7 +656,7 @@ const AoVivo = {
       const item = p.items?.[0], o = item?.sellers?.[0]?.commertialOffer;
       if (!o || !o.Price || o.AvailableQuantity === 0) return [];
       return [{mercado, nome: p.productName || "", preco: o.Price, preco_de: o.ListPrice, marca: p.brand || "",
-               imagem: item.images?.[0]?.imageUrl || "", url: `https://${VTEX_SITE[host] || host}/${p.linkText || ""}/p`}];
+               imagem: item.images?.[0]?.imageUrl || "", url: `https://${VTEX_SITE[host] || host}/${p.linkText || ""}/p`, ean: String(item.ean || "").trim()}];
     });
   },
   // Pão de Açúcar e Extra usam a mesma API do grupo GPA: muda o código da rede e a loja que atende o CEP
@@ -680,9 +761,9 @@ const Dados = {
   naLista(k) { return this.d.lista.some(i => i.prod && i.prod.k === k); },
 };
 function contadores() {
-  $("#nFav").textContent = Dados.d.favoritos.length ? `(${Dados.d.favoritos.length})` : "";
+  $("#nFav").textContent = Dados.d.favoritos.length || "";
   const pend = Dados.d.lista.filter(i => !i.feito).length;
-  $("#nLista").textContent = pend ? `(${pend})` : "";
+  $("#nLista").textContent = pend || "";
 }
 
 // termo de busca genérico a partir do nome: "Arroz Agulhinha Tipo 1 CAMIL 5kg" -> "arroz agulhinha 5kg"
@@ -712,46 +793,79 @@ document.addEventListener("click", e => {
   const b = e.target.closest("[data-acao]"); if (!b) return;
   const p = vistos.get(b.dataset.k); if (!p) return;
   const termo = b.closest("#comparar") ? $("#q").value.trim() : "";
-  if (b.dataset.acao === "fav") { alternarFavorito(p, termo); b.classList.toggle("on", Dados.ehFav(b.dataset.k)); b.textContent = Dados.ehFav(b.dataset.k) ? "★" : "☆"; }
+  if (b.dataset.acao === "fav") { alternarFavorito(p, termo); const on = Dados.ehFav(b.dataset.k); b.classList.toggle("on", on); b.textContent = on ? "★ Favorito" : "☆ Favoritar"; }
   if (b.dataset.acao === "lista") { adicionarNaLista(p, termo); b.classList.add("ok"); b.textContent = "✓"; }
   if (b.closest("#favoritos")) carregarFavoritos();
 });
 
-// abas
-document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
-  document.querySelectorAll("nav button, .painel").forEach(x => x.classList.remove("ativo"));
-  b.classList.add("ativo"); $("#" + b.dataset.aba).classList.add("ativo");
-  if (b.dataset.aba === "ofertas") carregarOfertas();
-  if (b.dataset.aba === "folhetos") carregarFolhetos();
-  if (b.dataset.aba === "favoritos") carregarFavoritos();
-  if (b.dataset.aba === "lista") desenharLista(), calcularLista();
-  if (b.dataset.aba === "familia") { desenharFamilia(); Familia.sincronizar(); }
+// tocar num produto abre o detalhe: gráfico do preço, favoritar, link da loja e o mesmo produto em outros mercados
+document.addEventListener("click", e => {
+  const it = e.target.closest(".item"); if (!it || e.target.closest("button, a, input, .detalhe")) return;
+  if (it.classList.toggle("aberto")) abrirDetalhe(it);
 });
+async function abrirDetalhe(el) {
+  const p = vistos.get(el.dataset.k), d = el.querySelector(".detalhe");
+  if (!p || !d || d.dataset.pronto) return;
+  d.dataset.pronto = "1";
+  if (p.ean) {   // mesmo código de barras em outra rede (só existe nos preços da coleta diária)
+    const porMercado = {};
+    for (const x of Estatico.produtos || []) {
+      if (x.ean !== p.ean || x.mercado === p.mercado || !Regiao.tem(x.mercado)) continue;
+      if (!porMercado[x.mercado] || x.preco < porMercado[x.mercado].preco) porMercado[x.mercado] = x;
+    }
+    const linhas = Object.values(porMercado).sort((a, b) => a.preco - b.preco).slice(0, 6);
+    if (linhas.length) d.insertAdjacentHTML("beforeend", `<div class="outros"><span class="sub">Mesmo produto em outros mercados</span>${linhas.map(x =>
+      `<div><span class="merc"><i style="background:${CORES[x.mercado] || "#888"}"></i>${esc(x.mercado)}</span><b>${brl(x.preco)}</b></div>`).join("")}</div>`);
+  }
+  if (d.querySelector(".hist")) return;
+  const h = await historicoDe(p.mercado, p.nome).catch(() => null);
+  if (d.querySelector(".hist")) return;
+  d.insertAdjacentHTML("afterbegin", h && h.serie && h.serie.length > 1 ? svgHistorico(h.serie, h.mediana)
+    : `<div class="sem-hist">O gráfico de preço aparece depois de alguns dias de coleta deste produto.</div>`);
+}
+
+// abas: cinco na barra; Folhetos e Família abrem a partir de "Mais"
+const TITULOS = {comparar: "Comparar", ofertas: "Ofertas", favoritos: "Favoritos", lista: "Lista", mais: "Mais", folhetos: "Folhetos", familia: "Família"};
+function abrirAba(aba) {
+  document.querySelectorAll("nav button, .painel").forEach(x => x.classList.remove("ativo"));
+  (document.querySelector(`nav [data-aba="${aba}"]`) || document.querySelector('nav [data-aba="mais"]')).classList.add("ativo");
+  $("#" + aba).classList.add("ativo"); $("#titulo").textContent = TITULOS[aba] || "";
+  window.scrollTo(0, 0);
+  if (aba === "ofertas") carregarOfertas();
+  if (aba === "folhetos") carregarFolhetos();
+  if (aba === "favoritos") carregarFavoritos();
+  if (aba === "lista") desenharLista(), calcularLista();
+  if (aba === "familia") { desenharFamilia(); Familia.sincronizar(); }
+  if (aba === "mais") desenharMais();
+}
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => abrirAba(b.dataset.aba));
+document.addEventListener("click", e => { const b = e.target.closest("[data-ir]"); if (b) abrirAba(b.dataset.ir); });
 
 function acoesHTML(p) {
   const k = chave(p); vistos.set(k, p);
-  const fav = Dados.ehFav(k), lst = Dados.naLista(k);
-  return `<div class="acoes">
-    <button class="acao${fav ? " on" : ""}" data-acao="fav" data-k="${esc(k)}" title="Favoritar" type="button">${fav ? "★" : "☆"}</button>
-    <button class="acao${lst ? " ok" : ""}" data-acao="lista" data-k="${esc(k)}" title="Pôr na lista de compras" type="button">${lst ? "✓" : "🛒"}</button></div>`;
+  const lst = Dados.naLista(k);
+  return `<div class="acoes"><button class="acao${lst ? " ok" : ""}" data-acao="lista" data-k="${esc(k)}" title="Pôr na lista de compras" aria-label="Pôr na lista de compras" type="button">${lst ? "✓" : "+"}</button></div>`;
 }
 
 function itemHTML(p, destaque, extraHTML = "") {
-  const cor = CORES[p.mercado] || "#555";
+  const cor = CORES[p.mercado] || "#888", k = chave(p), fav = Dados.ehFav(k);
   const unid = p.preco_unidade ? `<small>${brl(p.preco_unidade)}/${p.unidade}</small>` : "";
   const de = p.preco_de ? `<s>${brl(p.preco_de)}</s>` : "";
   const tags = [
-    `<span class="tag" style="background:${cor}">${esc(p.mercado)}</span>`,
+    `<span class="merc"><i style="background:${cor}"></i>${esc(p.mercado)}</span>`,
+    destaque ? `<span class="tag fol">menor preço</span>` : "",
     p.desconto > 0 ? `<span class="tag desc">-${Math.round(p.desconto)}%</span>` : "",
     p.origem === "folheto" ? `<span class="tag fol">folheto</span>` : "",
     p.extra ? `<span>${esc(p.extra)}</span>` : "",
     p.validade ? `<span>${esc(p.validade)}</span>` : "",
   ].join("");
   const img = p.origem === "folheto" ? "" : esc(p.imagem);
-  return `<div class="item${destaque ? " top" : ""}" data-k="${esc(chave(p))}">
+  return `<div class="item" data-k="${esc(k)}">
     ${img ? `<img loading="lazy" src="${img}" alt="">` : `<img alt="" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'/>">`}
-    <div class="corpo-item"><div class="nome"><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.nome)}</a></div><div class="meta">${tags}</div>${extraHTML}</div>
-    <div class="preco">${de}<b>${brl(p.preco)}</b>${unid}</div>${acoesHTML(p)}</div>`;
+    <div class="corpo-item"><div class="nome">${esc(p.nome)}</div><div class="meta">${tags}</div>${extraHTML}</div>
+    <div class="preco">${de}<b>${brl(p.preco)}</b>${unid}</div>${acoesHTML(p)}
+    <div class="detalhe"><div class="botoes"><button class="${fav ? "on" : ""}" data-acao="fav" data-k="${esc(k)}" type="button">${fav ? "★ Favorito" : "☆ Favoritar"}</button>
+      ${p.url ? `<a href="${esc(p.url)}" target="_blank" rel="noopener">${p.origem === "folheto" ? "Ver o folheto" : "Abrir no site"} ↗</a>` : ""}</div></div></div>`;
 }
 
 function ordenar(lista, ordem) {
@@ -779,21 +893,31 @@ async function buscar(forcar) {
 }
 
 function desenharBusca() {
-  const todos = estado.produtos;
+  const todos = estado.produtos.filter(p => Regiao.tem(p.mercado));
   const cont = {}; todos.forEach(p => cont[p.mercado] = (cont[p.mercado] || 0) + 1);
-  $("#filtroMercados").innerHTML = Object.keys(cont).sort().map(m =>
-    `<button class="chip${estado.ocultos.has(m) ? " off" : ""}" data-m="${esc(m)}" type="button"><span style="color:${CORES[m]||"inherit"}">●</span> ${esc(m)}<span class="n">${cont[m]}</span></button>`).join("");
+  const ms = Object.keys(cont).sort((a, b) => a.localeCompare(b, "pt-BR")), filtrando = ms.some(m => estado.ocultos.has(m));
+  $("#filtroMercados").innerHTML = ms.length > 1 ? [`<button class="chip${filtrando ? "" : " sel"}" data-m="" type="button">Todos<span class="n">${todos.length}</span></button>`,
+    ...ms.map(m => `<button class="chip${filtrando && !estado.ocultos.has(m) ? " sel" : ""}" data-m="${esc(m)}" type="button"><i style="background:${CORES[m] || "#888"}"></i>${esc(m)}<span class="n">${cont[m]}</span></button>`)].join("") : "";
+  $("#sugestoes").hidden = todos.length > 0; $("#ordem").hidden = !todos.length;
   const lista = ordenar(todos.filter(p => !estado.ocultos.has(p.mercado)), $("#ordem").value);
-  $("#infoBusca").innerHTML = todos.length
-    ? `${lista.length} produtos · <a href="#" id="refazer">buscar de novo nos sites</a>`
+  if (todos.length || $("#q").value.trim()) $("#infoBusca").innerHTML = todos.length
+    ? `${lista.length} produtos · <a href="#" id="refazer">buscar de novo</a>`
     : "Nada encontrado. Tente um termo mais simples (ex.: “arroz” em vez de “arroz tipo 1 5kg camil”).";
   const ref = $("#refazer"); if (ref) ref.onclick = e => { e.preventDefault(); buscar(true); };
   $("#resultado").innerHTML = lista.slice(0, 300).map((p, i) => itemHTML(p, i === 0)).join("");
   enriquecerHistorico("#resultado");
 }
+// filtro de mercados: o primeiro toque mostra só aquele mercado; os seguintes somam ou tiram; "Todos" limpa
 $("#filtroMercados").onclick = e => {
   const c = e.target.closest(".chip"); if (!c) return;
-  const m = c.dataset.m; estado.ocultos.has(m) ? estado.ocultos.delete(m) : estado.ocultos.add(m); desenharBusca();
+  const m = c.dataset.m, todos = [...new Set(estado.produtos.map(p => p.mercado))];
+  if (!m) estado.ocultos.clear();
+  else if (!todos.some(x => estado.ocultos.has(x))) estado.ocultos = new Set(todos.filter(x => x !== m));
+  else {
+    estado.ocultos.has(m) ? estado.ocultos.delete(m) : estado.ocultos.add(m);
+    if (todos.every(x => estado.ocultos.has(x))) estado.ocultos.clear();
+  }
+  desenharBusca();
 };
 
 // ---------- ofertas
@@ -805,7 +929,7 @@ async function carregarOfertas() {
 }
 function desenharOfertas() {
   const q = $("#qOf").value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
-  let lista = ofertas.filter(p => !q || (p.nome_busca || "").includes(q));
+  let lista = ofertas.filter(p => Regiao.tem(p.mercado) && (!q || (p.nome_busca || "").includes(q)));
   lista = ordenar(lista, $("#ordemOf").value);
   $("#infoOf").textContent = ofertas.length
     ? `${lista.length} ofertas (produtos com desconto, promoção ou vindos de folheto).`
@@ -834,7 +958,7 @@ function desenharFolhetos() {
   $("#infoFol").textContent = fs.length ? `${fs.length} páginas de folhetos vigentes em ${mercados.length} mercados. Toque numa página para abrir em tamanho real.`
                                         : "Nenhum folheto carregado. Clique em “Buscar folhetos novos”.";
   $("#filtroFol").innerHTML = fs.length ? [`<button class="chip${filtroFol ? "" : " sel"}" data-m="" type="button">Todos<span class="n">${fs.length}</span></button>`,
-    ...mercados.map(m => `<button class="chip${filtroFol === m ? " sel" : ""}" data-m="${esc(m)}" type="button"><span style="color:${CORES[m] || "inherit"}">●</span> ${esc(m)}<span class="n">${grupos[m].length}</span></button>`)].join("") : "";
+    ...mercados.map(m => `<button class="chip${filtroFol === m ? " sel" : ""}" data-m="${esc(m)}" type="button"><i style="background:${CORES[m] || "#888"}"></i>${esc(m)}<span class="n">${grupos[m].length}</span></button>`)].join("") : "";
   $("#gradeFol").innerHTML = mercados.filter(m => !filtroFol || m === filtroFol).map(m => {
     const lista = grupos[m], cor = CORES[m] || "#555";
     const itens = lista.reduce((t, f) => t + (f.n_itens || 0), 0), lidas = lista.filter(f => f.status === "lido").length;
@@ -881,7 +1005,7 @@ const custo = p => p.preco_unidade ?? p.preco;
 async function carregarFavoritos() {
   const favs = Dados.d.favoritos;
   if (!favs.length) {
-    $("#infoFav").textContent = "Nenhum favorito ainda. Toque na ☆ de qualquer produto (em Comparar ou Ofertas) para acompanhar o preço dele aqui.";
+    $("#infoFav").textContent = "Nenhum favorito ainda. Toque num produto (em Comparar ou Ofertas) e depois em “☆ Favoritar” para acompanhar o preço dele aqui.";
     $("#listaFav").innerHTML = ""; return;
   }
   $("#infoFav").textContent = "Carregando preços…";
@@ -1000,9 +1124,10 @@ async function enriquecerHistorico(seletor) {
     if (!h || !h.veredito || h.veredito === "sem_historico") continue;
     const meta = el.querySelector(".meta");
     if (meta && !meta.querySelector(".tag.real, .tag.falsa, .tag.cara")) meta.insertAdjacentHTML("beforeend", seloHistorico(h));
-    const corpo = el.querySelector(".corpo-item");
-    if (corpo && h.serie && h.serie.length > 1 && !corpo.querySelector(".hist")) {
-      corpo.insertAdjacentHTML("beforeend", svgHistorico(h.serie, h.mediana));
+    const det = el.querySelector(".detalhe");
+    if (det && h.serie && h.serie.length > 1 && !det.querySelector(".hist")) {
+      det.querySelector(".sem-hist")?.remove();
+      det.insertAdjacentHTML("afterbegin", svgHistorico(h.serie, h.mediana));
     }
   }
 }
@@ -1225,53 +1350,124 @@ async function carregarSaude() {
 
 // ---------- lista de compras
 let precosLista = {};   // id do item -> {melhor, por_mercado, fixo}
+let modoLista = (() => { try { return localStorage.getItem("ofertas-lista-modo") === "dois" ? "dois" : "um"; } catch { return "um"; } })();
+
+// quanto o item custa em cada mercado, já na quantidade pedida.
+// compara a mesma quantidade: se o item é "arroz 5kg", um mercado que só tem 1kg entra com o preço de 5kg
+function custosDoItem(i) {
+  const pr = precosLista[i.id] || {}, usado = pr.fixo || pr.melhor, out = {};
+  const qRef = usado && usado.preco_unidade ? usado.preco / usado.preco_unidade : null;
+  for (const [m, p] of Object.entries(pr.por_mercado || {})) {
+    if (!Regiao.tem(m)) continue;
+    const mesmo = qRef && p.preco_unidade && p.unidade === usado.unidade;
+    out[m] = {p, valor: (mesmo ? p.preco_unidade * qRef : p.preco) * i.qtd};
+  }
+  return out;
+}
+// melhor dupla de mercados: a que cobre mais itens e, no empate, a mais barata
+// (cada item vai para o mercado da dupla em que sai mais barato)
+function melhorDupla(itens, custos) {
+  const ms = [...new Set(itens.flatMap(i => Object.keys(custos.get(i.id))))];
+  let par = null;
+  for (let x = 0; x < ms.length; x++) for (let y = x + 1; y < ms.length; y++) {
+    const a = ms[x], b = ms[y], onde = {};
+    let total = 0, n = 0;
+    for (const i of itens) {
+      const c = custos.get(i.id), ca = c[a], cb = c[b];
+      if (!ca && !cb) continue;
+      const m = !cb || (ca && ca.valor <= cb.valor) ? a : b;
+      onde[i.id] = m; total += c[m].valor; n++;
+    }
+    if (!par || n > par.n || (n === par.n && total < par.total - 0.005)) par = {a, b, total, n, onde};
+  }
+  return par;
+}
+function planoLista() {
+  const itens = Dados.d.lista.filter(i => !i.feito && precosLista[i.id]?.calculado);
+  const custos = new Map(itens.map(i => [i.id, custosDoItem(i)]));
+  const mercados = {};
+  let melhorTotal = 0, achados = 0;
+  for (const i of itens) {
+    const pr = precosLista[i.id], usado = pr.fixo || pr.melhor;
+    if (usado) { melhorTotal += usado.preco * i.qtd; achados++; }
+    for (const [m, c] of Object.entries(custos.get(i.id))) { mercados[m] ||= {total: 0, n: 0}; mercados[m].total += c.valor; mercados[m].n++; }
+  }
+  const ranking = Object.entries(mercados).sort((a, b) => (b[1].n - a[1].n) || (a[1].total - b[1].total));
+  return {itens, custos, ranking, melhorTotal, achados, par: melhorDupla(itens, custos)};
+}
+
 function desenharLista() {
-  const itens = Dados.d.lista;
-  $("#infoLista").textContent = itens.length ? "" : "Lista vazia. Adicione itens acima ou toque no 🛒 de qualquer produto.";
-  $("#itensLista").innerHTML = itens.map(i => {
-    const pr = precosLista[i.id] || {};
-    const usado = pr.fixo || pr.melhor;
+  const itens = Dados.d.lista, plano = planoLista();
+  document.querySelectorAll("#modoLista button").forEach(b => { b.classList.toggle("ativo", b.dataset.modo === modoLista); b.setAttribute("aria-selected", b.dataset.modo === modoLista); });
+  $("#modoLista").hidden = !itens.length;
+  $("#infoLista").textContent = itens.length ? "" : "Lista vazia. Adicione itens acima ou toque no + de qualquer produto.";
+  const linha = (i, mercado) => {
+    const pr = precosLista[i.id] || {}, c = mercado ? plano.custos.get(i.id)?.[mercado] : null;
+    const usado = c ? c.p : (pr.fixo || pr.melhor);
     let onde = "<span class='sub'>buscando preço…</span>";
-    if (pr.calculado && !usado) onde = "Não encontrado nas lojas online. Tente um nome mais simples.";
+    if (c) onde = `${esc(c.p.nome)} (${brl(c.p.preco)}${c.p.preco_unidade ? `, ${brl(c.p.preco_unidade)}/${c.p.unidade}` : ""})`;
+    else if (pr.calculado && !usado) onde = "Não encontrado nas lojas online. Tente um nome mais simples.";
     else if (usado) {
       onde = `${pr.fixo ? "Escolhido" : "Mais barato"}: <b>${esc(usado.mercado)}</b> — ${esc(usado.nome)} (${brl(usado.preco)}${usado.preco_unidade ? `, ${brl(usado.preco_unidade)}/${usado.unidade}` : ""})`;
       if (pr.fixo && pr.melhor && custo(pr.melhor) < custo(pr.fixo) && chave(pr.melhor) !== chave(pr.fixo))
         onde += `<br>💡 Mais barato: ${esc(pr.melhor.mercado)} — ${esc(pr.melhor.nome)} (${brl(pr.melhor.preco)})`;
     } else if (i.prod) onde = `Escolhido: <b>${esc(i.prod.mercado)}</b> — ${esc(i.prod.nome)}`;
+    const valor = c ? c.valor : usado ? usado.preco * i.qtd : null;
     return `<div class="linha-lista${i.feito ? " feito" : ""}" data-id="${i.id}">
-      <input type="checkbox" data-c="feito"${i.feito ? " checked" : ""} title="Já peguei">
-      <input type="number" min="1" value="${i.qtd}" data-c="qtd" title="Quantidade">
+      <input type="checkbox" data-c="feito"${i.feito ? " checked" : ""} title="Já peguei" aria-label="Já peguei">
       <div><div class="txt">${esc(i.texto)}</div><div class="onde">${onde}</div></div>
-      <div class="preco valor"><b>${usado ? brl(usado.preco * i.qtd) : ""}</b></div>
-      <button class="acao" data-c="del" title="Remover" type="button">✕</button></div>`;
-  }).join("");
-  desenharTotais();
+      <div class="lado"><div class="preco valor"><b>${valor != null ? brl(valor) : ""}</b></div>
+        <input type="number" min="1" value="${i.qtd}" data-c="qtd" title="Quantidade" aria-label="Quantidade"></div>
+      <button class="del" data-c="del" title="Remover" aria-label="Remover" type="button">✕</button></div>`;
+  };
+  const secao = (esq, dir = "") => `<div class="secao-lista"><span>${esq}</span><b>${dir}</b></div>`;
+  const par = modoLista === "dois" ? plano.par : null;
+  if (par) {
+    const grupos = [par.a, par.b].map(m => ({m, itens: plano.itens.filter(i => par.onde[i.id] === m)}))
+      .filter(g => g.itens.length).sort((x, y) => y.itens.length - x.itens.length);
+    const resto = itens.filter(i => !i.feito && !(i.id in par.onde)), feitos = itens.filter(i => i.feito);
+    $("#itensLista").innerHTML = grupos.map(g => secao(
+        `<i style="background:${CORES[g.m] || "#888"}"></i><b>${esc(g.m)}</b> · ${g.itens.length} ${g.itens.length === 1 ? "item" : "itens"}`,
+        brl(g.itens.reduce((t, i) => t + plano.custos.get(i.id)[g.m].valor, 0))) + g.itens.map(i => linha(i, g.m)).join("")).join("")
+      + (resto.length ? secao("Sem preço nesses dois mercados") + resto.map(i => linha(i)).join("") : "")
+      + (feitos.length ? secao("Já peguei") + feitos.map(i => linha(i)).join("") : "");
+  } else $("#itensLista").innerHTML = itens.map(i => linha(i)).join("");
+  desenharTotais(plano);
 }
-function desenharTotais() {
-  const itens = Dados.d.lista.filter(i => !i.feito && precosLista[i.id]?.calculado);
-  if (!itens.length) { $("#tituloTotais").hidden = true; $("#totais").innerHTML = ""; $("#infoTotais").textContent = ""; return; }
-  const mercados = {};
-  let melhorTotal = 0, achados = 0;
-  for (const i of itens) {
-    const pr = precosLista[i.id];
-    const usado = pr.fixo || pr.melhor;
-    if (usado) { melhorTotal += usado.preco * i.qtd; achados++; }
-    // compara a mesma quantidade: se o item é "arroz 5kg", um mercado que só tem 1kg entra com o preço de 5kg
-    const qRef = usado && usado.preco_unidade ? usado.preco / usado.preco_unidade : null;
-    for (const [m, p] of Object.entries(pr.por_mercado || {})) {
-      const mesmo = qRef && p.preco_unidade && p.unidade === usado.unidade;
-      mercados[m] ||= {total: 0, n: 0};
-      mercados[m].total += (mesmo ? p.preco_unidade * qRef : p.preco) * i.qtd; mercados[m].n++;
-    }
+function desenharTotais(plano = planoLista()) {
+  const {itens, ranking, melhorTotal, achados, par} = plano;
+  if (!itens.length) { $("#tituloTotais").hidden = true; $("#totais").innerHTML = ""; $("#infoTotais").textContent = ""; $("#resumoLista").innerHTML = ""; return; }
+  const unico = ranking[0];   // [mercado, {total, n}]: o que tem mais itens e, no empate, o mais barato
+  const cartao = (cima, valor, baixo) => `<div class="resumo-lista"><small>${cima}</small><b>${valor}</b><small>${baixo}</small></div>`;
+  let resumo = "";
+  if (modoLista === "dois" && par) {
+    const quantos = m => Object.values(par.onde).filter(x => x === m).length;
+    const nomes = [par.a, par.b].filter(quantos).sort((x, y) => quantos(y) - quantos(x));
+    let comp = "";
+    if (nomes.length < 2) comp = "Um mercado só já resolve: nenhum outro deixa a compra mais barata.";
+    else if (unico[1].n < par.n) comp = `Num mercado só, o melhor (${esc(unico[0])}) tem ${unico[1].n} de ${itens.length} itens.`;
+    else if (unico[1].total - par.total >= 0.01) comp = `${brl(unico[1].total - par.total)} a menos que tudo no ${esc(unico[0])} (${brl(unico[1].total)}).`;
+    else comp = `Sai o mesmo que comprar tudo no ${esc(unico[0])}.`;
+    resumo = cartao(`Comprando em ${nomes.map(esc).join(" e ")}`, brl(par.total), `${par.n} de ${itens.length} itens. ${comp}`);
+  } else if (unico) {
+    const falta = unico[1].n < itens.length ? ` (faltam ${itens.length - unico[1].n})` : "";
+    const dica = par && par.n >= unico[1].n && unico[1].total - par.total >= 0.01 ? ` Dividindo em 2 mercados sairia ${brl(par.total)}.` : "";
+    resumo = cartao(`Tudo no ${esc(unico[0])}`, brl(unico[1].total), `${unico[1].n} de ${itens.length} itens${falta}.${dica}`);
   }
-  const ranking = Object.entries(mercados).sort((a, b) => (b[1].n - a[1].n) || (a[1].total - b[1].total));
+  $("#resumoLista").innerHTML = resumo;
   $("#tituloTotais").hidden = false;
   $("#infoTotais").textContent = `Para ${itens.length} itens pendentes. Cada mercado entra com a opção mais barata (por kg/L) que ele tem de cada item, na mesma quantidade do item escolhido.`;
   $("#totais").innerHTML =
-    `<div class="total melhor"><span class="sub">Comprando o mais barato de cada item</span><b>${brl(melhorTotal)}</b><span class="sub">${achados} de ${itens.length} itens · vários mercados</span></div>` +
-    ranking.map(([m, t], idx) => `<div class="total"><span class="tag" style="background:${CORES[m] || "#555"}">${esc(m)}</span>
+    `<div class="total melhor"><span class="sub">O mais barato de cada item</span><b>${brl(melhorTotal)}</b><span class="sub">${achados} de ${itens.length} itens · vários mercados</span></div>` +
+    ranking.map(([m, t], idx) => `<div class="total"><span class="merc"><i style="background:${CORES[m] || "#888"}"></i>${esc(m)}</span>
       <b>${brl(t.total)}</b><span class="sub">${t.n} de ${itens.length} itens${t.n < itens.length ? " (faltam " + (itens.length - t.n) + ")" : ""}${idx === 0 && t.n === itens.length ? " · melhor num lugar só" : ""}</span></div>`).join("");
 }
+$("#modoLista").onclick = e => {
+  const b = e.target.closest("[data-modo]"); if (!b) return;
+  modoLista = b.dataset.modo;
+  try { localStorage.setItem("ofertas-lista-modo", modoLista); } catch {}
+  desenharLista();
+};
 let calcId = 0;
 async function calcularLista() {
   const itens = Dados.d.lista.filter(i => !precosLista[i.id]?.calculado || calcularLista.forcar);
@@ -1317,10 +1513,21 @@ $("#btnWhatsapp").onclick = () => {
   const pend = Dados.d.lista.filter(i => !i.feito);
   if (!pend.length) return;
   const linhas = ["*Lista de compras*", ""];
-  for (const i of pend) {
+  const plano = planoLista(), par = modoLista === "dois" ? plano.par : null;
+  const item = i => `• ${i.qtd > 1 ? i.qtd + "x " : ""}${i.texto}`;
+  if (par) {   // dividida em 2: um bloco por mercado
+    for (const m of [par.a, par.b]) {
+      const doMercado = plano.itens.filter(i => par.onde[i.id] === m);
+      if (!doMercado.length) continue;
+      linhas.push(`*${m}*`, ...doMercado.map(i => `${item(i)} — ${reais(plano.custos.get(i.id)[m].valor)}`), "");
+    }
+    const resto = pend.filter(i => !(i.id in par.onde));
+    if (resto.length) linhas.push("*Outros*", ...resto.map(item), "");
+    linhas.push(`Total: ${reais(par.total)}`);
+  } else for (const i of pend) {
     const pr = precosLista[i.id] || {};
     const usado = pr.fixo || pr.melhor;
-    linhas.push(`• ${i.qtd > 1 ? i.qtd + "x " : ""}${i.texto}${usado ? ` — ${reais(usado.preco * i.qtd)} no ${usado.mercado}` : ""}`);
+    linhas.push(`${item(i)}${usado ? ` — ${reais(usado.preco * i.qtd)} no ${usado.mercado}` : ""}`);
   }
   if (Familia.codigo) linhas.push("", `Lista da família: ${Familia.codigo}`);
   const url = "https://wa.me/?text=" + encodeURIComponent(linhas.join("\n"));
@@ -1331,7 +1538,9 @@ $("#btnWhatsapp").onclick = () => {
 function mostrarCep(info) {
   const e = info && info.endereco;
   $("#btnCep").classList.toggle("vazio-cep", !e);
-  $("#btnCep").textContent = e ? `📍 ${e.cep.replace(/(\d{5})(\d{3})/, "$1-$2")} · ${e.bairro || e.cidade}` : "📍 Informe seu CEP";
+  const cepFmt = e ? e.cep.replace(/(\d{5})(\d{3})/, "$1-$2") : "";
+  $("#btnCep").textContent = e ? `${e.bairro || e.cidade} · ${cepFmt}` : "Informe seu CEP";
+  $("#rotCep").textContent = e ? `${cepFmt} · ${[e.bairro, e.cidade].filter(Boolean).join(", ")}` : "não informado";
   if (!e) { $("#resumoCep").innerHTML = ""; return; }
   const reg = Object.entries(info.redes_regionalizadas || {}).filter(([, v]) => v).map(([m]) => m);
   const assai = (e.assai || [])[0];
@@ -1342,6 +1551,7 @@ function mostrarCep(info) {
 }
 $("#btnCep").onclick = () => { $("#erroCep").hidden = true; $("#dlgCep").showModal(); $("#inpCep").focus(); };
 $("#btnCepCancelar").onclick = () => $("#dlgCep").close();
+$("#linhaCep").onclick = () => $("#btnCep").click();
 $("#inpCep").oninput = e => { const d = e.target.value.replace(/\D/g, "").slice(0, 8); e.target.value = d.length > 5 ? d.slice(0, 5) + "-" + d.slice(5) : d; };
 $("#formCep").onsubmit = async e => {
   e.preventDefault();
@@ -1368,14 +1578,43 @@ function desenharRegioes() {
 }
 function montarMercadosOf() {
   const sel = $("#mercadoOf").value, r = Regiao.def();
-  const mercados = [...new Set([...(r.online || []), ...(r.folhetos || [])])].sort((a, b) => a.localeCompare(b, "pt-BR"));
+  const mercados = [...new Set([...(r.online || []), ...(r.folhetos || [])])].filter(m => Regiao.tem(m)).sort((a, b) => a.localeCompare(b, "pt-BR"));
   $("#mercadoOf").innerHTML = `<option value="">Todos os mercados</option>` + mercados.map(m => `<option${m === sel ? " selected" : ""}>${esc(m)}</option>`).join("");
 }
+// ---------- tela Mais: "Meus mercados" (só os ligados entram na busca, nas ofertas e na lista)
+function desenharMais() {
+  const r = Regiao.def(), online = new Set(r.online || []);
+  const ms = [...new Set([...online, ...(r.folhetos || [])])].sort((a, b) => a.localeCompare(b, "pt-BR"));
+  $("#meusMercados").innerHTML = ms.map(m => `<label class="linha"><span class="merc"><i style="background:${CORES[m] || "#888"}"></i></span>
+    <span class="rot">${esc(m)}${online.has(m) ? "" : "<small>só folheto</small>"}</span>
+    <input class="chave" type="checkbox" role="switch" data-m="${esc(m)}"${Regiao.desligados.has(m) ? "" : " checked"}></label>`).join("");
+  const lig = ms.filter(m => !Regiao.desligados.has(m)).length;
+  $("#infoMercados").textContent = !ms.length ? "" : lig === ms.length ? "Desligue os mercados que você não frequenta: só os ligados entram na busca, nas ofertas e na lista."
+    : lig ? `${lig} de ${ms.length} ligados. Só eles entram na busca, nas ofertas e na lista.` : "Todos desligados: ligue pelo menos um mercado para ver preços.";
+}
+$("#meusMercados").onchange = e => {
+  const m = e.target.dataset.m; if (!m) return;
+  e.target.checked ? Regiao.desligados.delete(m) : Regiao.desligados.add(m);
+  try { localStorage.setItem("ofertas-mercados-off", JSON.stringify([...Regiao.desligados])); } catch {}
+  // o que estava calculado contava com os mercados de antes
+  Estatico._fol = null; AoVivo.cache.clear(); precosLista = {}; estado.ocultos.clear();
+  montarMercadosOf(); desenharMais(); status();
+  if ($("#q").value.trim()) buscar(); else desenharBusca();
+  carregarOfertas();
+};
+let pedidoInstalar = null;
+window.addEventListener("beforeinstallprompt", e => { e.preventDefault(); pedidoInstalar = e; });
+$("#linhaInstalar").onclick = () => {
+  if (pedidoInstalar) { pedidoInstalar.prompt(); pedidoInstalar = null; return; }
+  $("#rotInstalar").textContent = /iphone|ipad/i.test(navigator.userAgent)
+    ? "No Safari: toque em Compartilhar e depois em “Adicionar à Tela de Início”."
+    : "No menu do navegador (⋮), toque em “Instalar app” ou “Adicionar à tela inicial”.";
+};
 $("#regioes").onclick = async e => {
   const b = e.target.closest("[data-r]"); if (!b || b.dataset.r === Regiao.atual) return;
   Regiao.atual = b.dataset.r;
   try { localStorage.setItem("ofertas-regiao", Regiao.atual); } catch {}
-  desenharRegioes(); montarMercadosOf();
+  desenharRegioes(); montarMercadosOf(); desenharMais();
   if (Estatico.ativo) { AoVivo.carregarLocal(); Estatico._fol = null; }
   else await apiFetch("/api/local", {method: "POST", body: JSON.stringify({cep: Regiao.def().cep})});   // app do PC: usa o CEP da região
   apiFetch("/api/local").then(r => r.json()).then(mostrarCep);
@@ -1397,8 +1636,9 @@ async function status() {
   if (rodando) $(alvo).innerHTML = barra;
   $("#btnAtualOf").disabled = $("#btnLerFol").disabled = rodando;
   const total = s.contagens.reduce((a, c) => a + c.n, 0);
-  if (s.regioes && !Object.keys(Regiao.lista).length) { Regiao.lista = s.regioes; desenharRegioes(); montarMercadosOf(); }
-  $("#resumo").textContent = `${Regiao.redes().size || s.mercados_online.length + s.mercados_folheto.length} redes · ${total.toLocaleString("pt-BR")} preços`;
+  if (s.regioes && !Object.keys(Regiao.lista).length) { Regiao.lista = s.regioes; desenharRegioes(); montarMercadosOf(); desenharMais(); }
+  const nRedes = [...Regiao.redes()].filter(m => Regiao.tem(m)).length || s.mercados_online.length + s.mercados_folheto.length;
+  $("#resumo").textContent = `${nRedes} ${nRedes === 1 ? "rede" : "redes"} · ${total.toLocaleString("pt-BR")} preços`;
   $("#avisoIA").innerHTML = s.ia ? "" : `<div class="aviso">A leitura automática de folhetos está desligada: ${esc(s.ia_motivo)}. Veja o LEIAME.md. Sem ela, os folhetos aparecem só como imagens.</div>`;
   if (!rodando && timer) {
     clearInterval(timer); timer = null;
@@ -1419,20 +1659,22 @@ function acompanhar() { if (!timer) timer = setInterval(status, 1500); status();
     const d = new Date(Estatico.meta.gerado_em);
     $("#infoBusca").textContent = `Preços coletados em ${d.toLocaleDateString("pt-BR")} às ${d.toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}. Atualiza sozinho todo dia.`;
   }
+  if (Estatico.ativo && Estatico.meta.gerado_em) {
+    const d = new Date(Estatico.meta.gerado_em);
+    $("#infoColeta").textContent = `Preços coletados em ${d.toLocaleDateString("pt-BR")} às ${d.toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}. A coleta roda sozinha todo dia.`;
+  }
   await Dados.carregar();
   // família: se este aparelho já entrou numa, pega a versão mais nova antes de desenhar a lista
   if (Familia.codigo) await Familia.sincronizar();
   desenharFamilia();
   apiFetch("/api/local").then(r => r.json()).then(info => {
     mostrarCep(info);
-    // pede o CEP na primeira visita (depois disso, cada região usa o CEP salvo ou o padrão dela)
-    let perguntado = false;
-    try { perguntado = !!localStorage.getItem("ofertas-cep-perguntado"); localStorage.setItem("ofertas-cep-perguntado", "1"); } catch {}
-    if (!info.endereco || (AoVivo.ativo && AoVivo.local?.padrao && !perguntado)) $("#btnCep").click();
+    // cada região já tem um CEP padrão: a janela só abre sozinha quando não há endereço nenhum
+    if (!info.endereco) $("#btnCep").click();
   }).catch(() => {});
   const s = await status();
   montarLojasAssai(s);
-  desenharRegioes(); montarMercadosOf();
+  desenharRegioes(); montarMercadosOf(); desenharMais();
   if (s.trabalho.tarefa && !s.trabalho.fim) acompanhar();
   // de tempos em tempos, busca a lista da família de novo (alguém marcou "leite" no mercado)
   setInterval(() => { if (Familia.codigo && !document.hidden) Familia.sincronizar(); }, 20000);

@@ -24,6 +24,23 @@ O site ficou parado nos dados de 09/11 e o histórico nunca passou de 1 ponto po
 
 Testes: 62, todos passando. Backup em `backups/antes-correcao-2026-11-12-0509/`.
 
+## Design novo de 12/11/2026 (Claude)
+
+`static/index.html` ganhou visual novo, sem mudar as buscas nem os dados:
+
+- Abas embaixo no celular (Comparar, Ofertas, Favoritos, Lista, Mais) e barra lateral no computador.
+  Folhetos e Família abrem a partir de "Mais". Tudo passa por `abrirAba()`.
+- Produtos em linhas compactas. Tocar no produto abre o detalhe: gráfico do histórico, favoritar,
+  link da loja e o mesmo produto em outros mercados (pelo código de barras).
+- **Meus mercados** (tela Mais): o que o usuário desliga fica em `localStorage["ofertas-mercados-off"]`
+  e sai de tudo por `Regiao.tem()`.
+- **Lista dividida em até 2 mercados**: `planoLista()` e `melhorDupla()` escolhem a dupla que cobre
+  mais itens e, no empate, a mais barata. O modo fica em `localStorage["ofertas-lista-modo"]`.
+- A janela do CEP não abre mais sozinha na primeira visita (cada região já tem CEP padrão).
+- `sw.js` passou para `ofertas-sp-v2`, para o app instalado trocar a casca antiga.
+
+Backup em `backups/antes-design-2026-11-12-2207/`.
+
 ## O que foi pedido
 
 O usuário listou 7 ideias para o Ofertas SP e pediu: fazer o que eu achasse melhor, incluir

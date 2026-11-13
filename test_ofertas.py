@@ -534,6 +534,21 @@ class TestInterface(unittest.TestCase):
         for aba in ("Favoritos", "Lista", "Família", "Folhetos"):
             self.assertIn(aba, self.html, f"aba {aba} sumiu")
 
+    def test_abas_embaixo_e_tela_mais(self):
+        """Cinco abas na barra; Folhetos e Família abrem a partir de Mais."""
+        for aba in ("comparar", "ofertas", "favoritos", "lista", "mais"):
+            self.assertIn(f'data-aba="{aba}"', self.html, f"aba {aba} sumiu da barra")
+        for destino in ("folhetos", "familia"):
+            self.assertIn(f'data-ir="{destino}"', self.html, f"falta o caminho para {destino}")
+        self.assertIn("function abrirAba(", self.html)
+
+    def test_meus_mercados_e_lista_dividida(self):
+        self.assertIn('id="meusMercados"', self.html)
+        self.assertIn("ofertas-mercados-off", self.html, "a escolha dos mercados tem que ficar salva")
+        self.assertIn("!this.desligados.has(m)", self.html, "mercado desligado não pode entrar em Regiao.tem")
+        self.assertIn('data-modo="dois"', self.html)
+        self.assertIn("function melhorDupla(", self.html)
+
     def test_veredito_local_espelha_o_python(self):
         """Se a regra mudar num lado e não no outro, o site e o app discordam."""
         for pedaco in ("MIN_DIAS_JULGAR = 14", 'veredito: "inflada"', 'veredito: "boa"',
