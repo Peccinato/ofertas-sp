@@ -7,6 +7,14 @@ sessão) retomar este trabalho, leia isto primeiro e continue daqui.
 
 ---
 
+## Aviso falso do Extra na busca ao vivo, 13/11/2026 (Claude)
+
+Na busca "arroz 5 kg" o site mostrava "Não responderam agora: Extra". O Extra tinha respondido 404
+"Products not found" (loja sem o produto). O Python já tratava isso (`buscar_gpa`); faltava o site.
+`pedir` agora guarda o código e o corpo do erro (`erro.status`, `erro.corpo`) e `gpa` devolve lista
+vazia nesse caso; os outros erros continuam como falha. sw.js v6.
+Backup: `backups/2026-11-13-extra404-site/`.
+
 ## Design em seis áreas, 13/11/2026 (Claude)
 
 Pedido do dono, com prévia de antes e depois aprovada:

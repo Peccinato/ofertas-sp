@@ -645,7 +645,11 @@ const AoVivo = {
   async pedir(url, corpo) {
     const r = await fetch(this.proxy + "/?url=" + encodeURIComponent(url), corpo
       ? {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(corpo)} : {});
-    if (!r.ok) throw new Error("HTTP " + r.status);
+    if (!r.ok) {
+      const erro = new Error("HTTP " + r.status);
+      erro.status = r.status; erro.corpo = await r.text().catch(() => "");
+      throw erro;
+    }
     return r;
   },
   json(url, corpo) { return this.pedir(url, corpo).then(r => r.json()); },
@@ -736,8 +740,15 @@ const AoVivo = {
   // Pão de Açúcar e Extra usam a mesma API do grupo GPA: muda o código da rede e a loja que atende o CEP
   async gpa(mercado, termo, n) {
     const [rede, chaveRegiao, lojaPadrao] = mercado === "Extra" ? ["ex", "extra", 570] : ["pa", "gpa", 461];
-    const d = await this.json(`https://api.vendas.gpa.digital/${rede}/search/search`, {terms: termo, page: 1, sortBy: "relevance",
-      resultsPerPage: n, allowRedirect: false, storeId: this.local?.regiao?.[chaveRegiao]?.id || lojaPadrao, department: "ecom", customerPlus: true, partner: "linx"});
+    let d;
+    try {
+      d = await this.json(`https://api.vendas.gpa.digital/${rede}/search/search`, {terms: termo, page: 1, sortBy: "relevance",
+        resultsPerPage: n, allowRedirect: false, storeId: this.local?.regiao?.[chaveRegiao]?.id || lojaPadrao, department: "ecom", customerPlus: true, partner: "linx"});
+    } catch (e) {
+      // a loja sem o produto responde 404 "Products not found" em vez de lista vazia: não é falha (igual ao buscar_gpa do Python)
+      if (e.status === 404 && /not found/i.test(e.corpo || "")) return [];
+      throw e;
+    }
     return (d.products || []).filter(p => p.stock && p.price).map(p => {
       const promo = p.productPromotion || {};
       let img = (p.productImages || [""])[0];
