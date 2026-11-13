@@ -3,14 +3,14 @@
  * Objetivo: dentro do mercado, sem sinal, a lista e os últimos preços continuam abrindo.
  *
  * Estratégia por tipo de pedido:
- *   - a casca do app (index.html, manifest, ícones): cache primeiro, rede depois;
+ *   - a casca do app e os dados do dia: rede primeiro, guardado só quando não há conexão;
  *   - GET /api/...: rede primeiro, cache como rede de segurança (preço velho é melhor que tela vazia);
  *   - POST /api/...: se a rede falhar, entra numa fila e é reenviado quando a conexão volta.
  *
  * O que NÃO é guardado: nada de 11 MB de catálogo. O offline é a lista, os favoritos e o preço
  * desses itens — alguns KB, que é o que cabe e o que importa dentro da loja.
  */
-const VERSAO = "ofertas-sp-v2";
+const VERSAO = "ofertas-sp-v3";
 const CASCA = ["./", "index.html", "manifest.json", "icone-192.png", "icone-512.png"];
 const MAX_API = 60;          // quantas respostas de API guardar
 const FILA_CHAVE = "ofertas-fila";
@@ -75,19 +75,17 @@ self.addEventListener("fetch", e => {
     return;
   }
 
-  // casca do app
+  // casca do app e dados do dia: rede primeiro, para a versão e os preços novos aparecerem na hora;
+  // o que está guardado só entra quando não há conexão (dentro do mercado, sem sinal).
+  // Antes era "guardado primeiro": cada visita mostrava a página e os preços da visita anterior.
   e.respondWith((async () => {
-    const salvo = await caches.match(req);
-    if (salvo) {
-      // atualiza em segundo plano, para a próxima abertura já ter a versão nova
-      fetch(req).then(r => { if (r.ok) caches.open(VERSAO).then(c => c.put(req, r)); }).catch(() => {});
-      return salvo;
-    }
     try {
       const r = await fetch(req);
       if (r.ok) caches.open(VERSAO).then(c => c.put(req, r.clone()));
       return r;
     } catch {
+      const salvo = await caches.match(req);
+      if (salvo) return salvo;
       const raiz = await caches.match("index.html");
       return raiz || new Response("Sem conexão", {status: 503, headers: {"Content-Type": "text/plain"}});
     }

@@ -153,13 +153,29 @@
   .total { background: var(--card); border-radius: var(--raio); padding: 10px 12px; }
   .total b { font-size: 17px; display: block; } .total.melhor { box-shadow: 0 0 0 2px var(--acento) inset; }
   .total .sub { display: block; font-size: 12px; }
+  /* rota: casa -> lojas -> casa */
+  .rota { background: var(--card); border-radius: var(--raio); padding: 12px 14px; margin-top: 12px; }
+  .rota:empty { display: none; }
+  .rota h3 { margin: 0 0 2px; font-size: 15px; }
+  .rota .total-rota { font-size: 21px; font-weight: 700; letter-spacing: -.02em; margin: 6px 0 2px; }
+  .rota ol { list-style: none; margin: 10px 0; padding: 0; }
+  .rota li { display: flex; gap: 10px; align-items: baseline; padding: 7px 0; border-top: 1px solid var(--linha); font-size: 13.5px; }
+  .rota li .num { flex: none; width: 20px; height: 20px; border-radius: 50%; background: var(--acento-2); color: var(--acento); font-size: 11.5px; font-weight: 700; text-align: center; line-height: 20px; }
+  .rota li .onde-loja { flex: 1; min-width: 0; } .rota li small { display: block; color: var(--sub); font-size: 12px; }
+  .rota li a { font-size: 12.5px; font-weight: 600; text-decoration: none; white-space: nowrap; }
+  .rota .botoes { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+  .rota .botoes a.btn { font: inherit; padding: 10px 14px; border-radius: 12px; background: var(--acento); color: var(--sobre-acento); font-weight: 600; text-decoration: none; }
+  .rota .ligacao { font: inherit; font-size: 13px; font-weight: 600; color: var(--acento); background: none; border: 0; padding: 0; cursor: pointer; }
+  .rota .carro { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; font-size: 13px; color: var(--sub); }
+  .rota .carro input { width: 74px; padding: 6px 8px; border-radius: 8px; background: var(--bg); text-align: center; }
+  .rota .conta { margin-top: 8px; font-size: 13.5px; } .rota .conta b { color: var(--acento); }
   /* modo mercado: letras grandes, para usar andando */
   body.modo-mercado .linha-lista { padding: 16px 14px; }
   body.modo-mercado .linha-lista .txt { font-size: 21px; font-weight: 700; }
   body.modo-mercado .linha-lista input[type=checkbox] { width: 30px; height: 30px; }
   body.modo-mercado .linha-lista .onde, body.modo-mercado .linha-lista .lado, body.modo-mercado header, body.modo-mercado nav,
   body.modo-mercado #formLista, body.modo-mercado #modoLista, body.modo-mercado #resumoLista, body.modo-mercado #tituloTotais,
-  body.modo-mercado #infoTotais, body.modo-mercado #totais, body.modo-mercado .so-fora-do-mercado { display: none; }
+  body.modo-mercado #infoTotais, body.modo-mercado #totais, body.modo-mercado #rotaLista, body.modo-mercado .so-fora-do-mercado { display: none; }
 
   /* folhetos */
   .grade { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
@@ -270,6 +286,7 @@
     <div id="resumoLista"></div>
     <div class="info" id="infoLista"></div>
     <div class="lista" id="itensLista"></div>
+    <div class="rota" id="rotaLista"></div>
     <div class="chips" style="margin-top:12px">
       <button class="chip" id="btnModoMercado" type="button">Modo mercado</button>
       <button class="chip so-fora-do-mercado" id="btnWhatsapp" type="button">Mandar no WhatsApp</button>
@@ -1452,7 +1469,7 @@ function desenharLista() {
 }
 function desenharTotais(plano = planoLista()) {
   const {itens, ranking, melhorTotal, achados, par} = plano;
-  if (!itens.length) { $("#tituloTotais").hidden = true; $("#totais").innerHTML = ""; $("#infoTotais").textContent = ""; $("#resumoLista").innerHTML = ""; return; }
+  if (!itens.length) { $("#tituloTotais").hidden = true; $("#totais").innerHTML = ""; $("#infoTotais").textContent = ""; $("#resumoLista").innerHTML = ""; $("#rotaLista").innerHTML = ""; return; }
   const unico = ranking[0];   // [mercado, {total, n}]: o que tem mais itens e, no empate, o mais barato
   const cartao = (cima, valor, baixo) => `<div class="resumo-lista"><small>${cima}</small><b>${valor}</b><small>${baixo}</small></div>`;
   let resumo = "";
@@ -1471,6 +1488,7 @@ function desenharTotais(plano = planoLista()) {
     resumo = cartao(`Tudo no ${esc(unico[0])}`, brl(unico[1].total), `${unico[1].n} de ${itens.length} itens${falta}.${dica}`);
   }
   $("#resumoLista").innerHTML = resumo;
+  desenharRota(plano);
   $("#tituloTotais").hidden = false;
   $("#infoTotais").textContent = `Para ${itens.length} itens pendentes. Cada mercado entra com a opção mais barata (por kg/L) que ele tem de cada item, na mesma quantidade do item escolhido.`;
   $("#totais").innerHTML =
@@ -1484,6 +1502,172 @@ $("#modoLista").onclick = e => {
   try { localStorage.setItem("ofertas-lista-modo", modoLista); } catch {}
   desenharLista();
 };
+// ---------- rota: da casa até as lojas da lista e de volta para casa
+// De onde vem cada coisa (tudo grátis e sem chave):
+//   endereço das lojas: a própria rede (VTEX, "pontos de retirada"), a lista de lojas do Assaí
+//                       ou a busca por nome do OpenStreetMap (Nominatim) para as demais;
+//   ordem, km e tempo:  OSRM (servidor público do OpenStreetMap), com um segundo servidor de reserva;
+//   navegação:          link do Google Maps (casa -> paradas -> casa) e do Waze por parada.
+// redes cujo nome no mapa não é o nome usado aqui: [o que buscar, como reconhecer o resultado (sem acento)]
+const NOME_NO_MAPA = {"Extra": ["Extra", /(^| )extra( |$)/], "Tenda Atacado": ["Tenda", /tenda/], "Oba Hortifruti": ["Oba", /(^| )oba( |$)/],
+  "Sam's Club": ["Sam's Club", /sam.?s club/], "Pague Menos": ["Pague Menos", /pague ?menos/], "BOA": ["Boa Supermercado", /(^| )boa( |$)/],
+  "Lopes": ["Supermercado Lopes", /lopes/], "Barbosa": ["Barbosa Supermercados", /barbosa/]};
+// nenhuma chamada da rota pode deixar a tela esperando para sempre
+const comPrazo = (url, opts = {}, ms = 12000) => { const c = new AbortController(), t = setTimeout(() => c.abort(), ms); return fetch(url, {...opts, signal: c.signal}).finally(() => clearTimeout(t)); };
+const pausa = ms => new Promise(r => setTimeout(r, ms));
+const Rota = {
+  estado: {chave: "", carregando: false, res: null, erro: ""},
+  guardado(k, padrao) { try { return JSON.parse(localStorage.getItem(k) || "null") ?? padrao; } catch { return padrao; } },
+  guardar(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+  km(a, b) {
+    const rad = Math.PI / 180, x = Math.sin((b.lat - a.lat) * rad / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin((b.lon - a.lon) * rad / 2) ** 2;
+    return 12742 * Math.asin(Math.sqrt(x));
+  },
+  // ponto de partida: a localização exata, se o usuário deu, ou o centro do CEP
+  casa() {
+    const e = AoVivo.local?.endereco || (Regiao.def().local || Estatico.meta.local || estado.status?.local)?.endereco;
+    const gps = this.guardado("ofertas-casa", null);
+    if (gps && (!e || e.lat == null || this.km(gps, e) < 60)) return {lat: gps.lat, lon: gps.lon, rotulo: "minha localização", exata: true};
+    return e && e.lat != null ? {lat: +e.lat, lon: +e.lon, rotulo: "CEP " + String(e.cep || "").replace(/(\d{5})(\d{3})/, "$1-$2"), cidade: e.cidade} : null;
+  },
+  async lojasVtex(host, casa) {
+    const url = `https://${host}/api/checkout/pub/pickup-points?geoCoordinates=${casa.lon};${casa.lat}&page=1&pageSize=30`;
+    const d = await comPrazo(AoVivo.ativo ? AoVivo.proxy + "/?url=" + encodeURIComponent(url) : url).then(r => r.json());
+    return (d.items || []).map(i => i.pickupPoint || {}).filter(p => p.address?.geoCoordinates?.length === 2 && !/entrega|funcion|digital|\badm\b/i.test(p.friendlyName || ""))
+      .map(p => ({nome: (p.friendlyName || "").replace(/^retire na loja\s*-\s*/i, "").replace(/\s*-\s*retirada$/i, ""),
+                  endereco: [p.address.street, p.address.number].filter(Boolean).join(", ") + (p.address.neighborhood ? " · " + p.address.neighborhood : ""),
+                  lon: +p.address.geoCoordinates[0], lat: +p.address.geoCoordinates[1]}));
+  },
+  // busca por nome no OpenStreetMap, em caixas cada vez maiores em volta de casa (a primeira que achar loja serve:
+  // redes grandes têm mais lojas do que o serviço devolve de uma vez)
+  async lojasOsm(mercado, casa) {
+    const [busca, padrao] = NOME_NO_MAPA[mercado] || [mercado, null], serve = n => padrao ? padrao.test(semAcento(n)) : semAcento(n).includes(semAcento(busca));
+    for (const g of [0.07, 0.2, 0.5]) {   // ~8 km, ~22 km, ~55 km
+      const caixa = [casa.lon - g, casa.lat + g, casa.lon + g, casa.lat - g].join(",");
+      const d = await comPrazo(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(busca)}&format=jsonv2&limit=40&bounded=1&addressdetails=1&viewbox=${caixa}`).then(r => r.json());
+      const lojas = (d || []).filter(x => x.category === "shop" && /supermarket|wholesale|greengrocer|butcher|frozen_food/.test(x.type) && serve(x.name || ""))
+        .map(x => ({nome: x.name, lat: +x.lat, lon: +x.lon, endereco: [x.address?.road, x.address?.house_number].filter(Boolean).join(", ") + (x.address?.suburb ? " · " + x.address.suburb : "")}));
+      if (lojas.length) return lojas;
+      await pausa(1100);   // o serviço pede no máximo uma consulta por segundo
+    }
+    return [];
+  },
+  // a loja mais perto de casa para uma rede (guardada no aparelho por 30 dias: loja não muda de lugar)
+  async loja(mercado, casa) {
+    const k = `${mercado}@${casa.lat.toFixed(2)},${casa.lon.toFixed(2)}`, cache = this.guardado("ofertas-lojas", {});
+    if (cache[k] && Date.now() - cache[k].t < 30 * 864e5) return cache[k].l;
+    let lojas = [], fonte = "";
+    try {
+      if (mercado === "Assaí" && (Estatico.meta.assai_lojas || []).length) { lojas = Estatico.meta.assai_lojas.map(l => ({nome: "Assaí " + l.nome, endereco: l.cidade || "", lat: l.lat, lon: l.lon})); fonte = "rede"; }
+      else if (VTEX_LOJAS[mercado]) { lojas = await this.lojasVtex(VTEX_LOJAS[mercado], casa); fonte = "rede"; }
+    } catch {}
+    lojas = lojas.filter(l => this.km(casa, l) < 60);
+    if (!lojas.length) { try { lojas = await this.lojasOsm(mercado, casa); fonte = "mapa"; } catch {} }
+    const l = lojas.map(x => ({...x, mercado, fonte, km: this.km(casa, x)})).sort((a, b) => a.km - b.km)[0] || null;
+    if (l) { cache[k] = {t: Date.now(), l}; this.guardar("ofertas-lojas", cache); }
+    return l;
+  },
+  // melhor ordem das paradas, km e minutos de ida e volta
+  async trajeto(casa, lojas) {
+    if (!lojas.length) return null;
+    const coords = [casa, ...lojas].map(p => `${p.lon},${p.lat}`).join(";");
+    for (const base of ["https://router.project-osrm.org/trip/v1/driving/", "https://routing.openstreetmap.de/routed-car/trip/v1/driving/"]) {
+      try {
+        const d = await comPrazo(`${base}${coords}?roundtrip=true&source=first&overview=false`, {}, 10000).then(r => r.json());
+        if (d.code !== "Ok" || !d.trips?.length) continue;
+        const ordem = lojas.map((l, i) => [d.waypoints[i + 1].waypoint_index, l]).sort((a, b) => a[0] - b[0]).map(x => x[1]);
+        return {km: d.trips[0].distance / 1000, min: d.trips[0].duration / 60, ordem, estimado: false};
+      } catch {}
+    }
+    // sem serviço de rotas: vizinho mais próximo em linha reta, com folga para as ruas
+    const ordem = [], resto = [...lojas];
+    let aqui = casa, reta = 0;
+    while (resto.length) { resto.sort((a, b) => this.km(aqui, a) - this.km(aqui, b)); const p = resto.shift(); reta += this.km(aqui, p); ordem.push(p); aqui = p; }
+    reta += this.km(aqui, casa);
+    return {km: reta * 1.4, min: reta * 1.4 * 2.5, ordem, estimado: true};
+  },
+  linkMaps(casa, paradas, semLoja) {
+    const ponto = p => `${p.lat},${p.lon}`, perto = casa.cidade ? " " + casa.cidade : "";
+    const meio = [...paradas.map(ponto), ...semLoja.map(m => m + perto)].map(encodeURIComponent).join("%7C");
+    return `https://www.google.com/maps/dir/?api=1&origin=${ponto(casa)}&destination=${ponto(casa)}&waypoints=${meio}&travelmode=driving`;
+  },
+  async calcular(mercados, comparar) {
+    const casa = this.casa(); if (!casa) return {erro: "Informe o CEP para calcular a rota."};
+    const achar = async ms => {
+      const lojas = [];
+      for (const m of ms) lojas.push(await this.loja(m, casa));
+      const com = lojas.filter(Boolean), semLoja = ms.filter((m, i) => !lojas[i]);
+      return {mercados: ms, semLoja, trajeto: await this.trajeto(casa, com)};
+    };
+    const principal = await achar(mercados), outra = comparar ? await achar([comparar]) : null;
+    return {casa, principal, outra};
+  },
+};
+const tempoTxt = min => min >= 60 ? `${Math.floor(min / 60)} h ${Math.round(min % 60)} min` : `${Math.round(min)} min`;
+const kmTxt = km => km.toLocaleString("pt-BR", {maximumFractionDigits: 1}) + " km";
+function desenharRota(plano) {
+  const {itens, ranking, par} = plano, el = $("#rotaLista"), unico = ranking[0];
+  if (!itens.length || !unico) { el.innerHTML = ""; return; }
+  const quantos = m => par ? Object.values(par.onde).filter(x => x === m).length : 0;
+  const dupla = modoLista === "dois" && par ? [par.a, par.b].filter(quantos) : [];
+  const mercados = dupla.length ? dupla : [unico[0]], comparar = dupla.length > 1 ? unico[0] : null;
+  const casa = Rota.casa(), chave = mercados.join("|") + "@" + (casa ? `${casa.lat},${casa.lon}` : "");
+  const e = Rota.estado;
+  if (e.chave !== chave) { e.chave = chave; e.res = null; e.erro = ""; e.carregando = false; }
+  const naOrdem = e.res?.principal.trajeto ? [...e.res.principal.trajeto.ordem.map(l => l.mercado), ...e.res.principal.semLoja] : mercados;
+  const cab = `<h3>Rota</h3><div class="sub">Casa → ${naOrdem.map(esc).join(" → ")} → casa</div>`;
+  const ondeEstou = casa ? `<button class="ligacao" id="btnRotaGps" type="button">${casa.exata ? "Partindo da minha localização · usar o CEP" : `Partindo do ${esc(casa.rotulo)} · usar minha localização`}</button>` : "";
+  if (e.carregando) { el.innerHTML = cab + `<div class="info" style="margin:10px 0 0">Procurando as lojas mais perto e calculando o caminho…</div>`; return; }
+  if (!e.res) {
+    el.innerHTML = cab + (e.erro ? `<div class="aviso" style="margin:10px 0 0">${esc(e.erro)}</div>` : "")
+      + `<div class="botoes"><button class="btn" id="btnRota" type="button">Calcular rota</button>${ondeEstou}</div>`;
+  } else {
+    const {principal: p, outra} = e.res, t = p.trajeto, carro = Rota.guardado("ofertas-carro", {});
+    const gasto = km => carro.kml > 0 && carro.preco > 0 ? km / carro.kml * carro.preco : null;
+    const paradas = t ? t.ordem : [];
+    const linhas = [`<li><span class="num">⌂</span><span class="onde-loja">Casa<small>${esc(e.res.casa.rotulo)}</small></span></li>`,
+      ...paradas.map((l, i) => `<li><span class="num">${i + 1}</span><span class="onde-loja">${esc(l.mercado)}<small>${esc([l.nome !== l.mercado ? l.nome : "", l.endereco].filter(Boolean).join(" · "))}${l.fonte === "mapa" ? " · endereço do OpenStreetMap, confira" : ""}</small></span>
+        <a href="https://waze.com/ul?ll=${l.lat},${l.lon}&navigate=yes" target="_blank" rel="noopener">Waze ↗</a></li>`),
+      ...p.semLoja.map(m => `<li><span class="num">?</span><span class="onde-loja">${esc(m)}<small>Não achei o endereço da loja: o Google Maps procura pelo nome.</small></span></li>`),
+      `<li><span class="num">⌂</span><span class="onde-loja">Casa</span></li>`];
+    const g = t ? gasto(t.km) : null;
+    let conta = "";
+    if (outra && outra.trajeto && t && par) {   // dividir em 2 ainda compensa depois de contar o caminho?
+      const g1 = gasto(outra.trajeto.km), difCompra = unico[1].total - par.total, difKm = t.km - outra.trajeto.km;
+      conta = `<div class="conta">Indo só ao ${esc(unico[0])}: ${kmTxt(outra.trajeto.km)}, ${tempoTxt(outra.trajeto.min)}. Dividir em 2 roda ${kmTxt(Math.abs(difKm))} a ${difKm >= 0 ? "mais" : "menos"}`
+        + (g != null && g1 != null && unico[1].n >= par.n ? ` e, contando o combustível, ${difCompra - (g - g1) >= 0.01 ? `<b>ainda economiza ${brl(difCompra - (g - g1))}</b>` : `<b style="color:var(--verm)">não compensa</b>: sai ${brl((g - g1) - difCompra)} mais caro`}.` : ".") + `</div>`;
+    }
+    el.innerHTML = cab + (t ? `<div class="total-rota">${kmTxt(t.km)} · ${tempoTxt(t.min)}</div>
+        <div class="sub">Ida e volta, na melhor ordem${t.estimado ? " (estimativa em linha reta: o serviço de rotas não respondeu)" : ", sem contar o trânsito"}${g != null ? ` · combustível ${brl(g)}` : ""}.</div>` : "")
+      + `<ol>${linhas.join("")}</ol>${conta}
+      <div class="botoes"><a class="btn" href="${esc(Rota.linkMaps(e.res.casa, paradas, p.semLoja))}" target="_blank" rel="noopener">Abrir no Google Maps ↗</a>${ondeEstou}</div>
+      <div class="carro"><span>Meu carro faz</span><input type="number" id="carroKml" min="1" step="0.1" placeholder="km/L" value="${carro.kml || ""}" aria-label="Consumo em km por litro">
+        <span>km/L, combustível a R$</span><input type="number" id="carroPreco" min="0.1" step="0.01" placeholder="preço" value="${carro.preco || ""}" aria-label="Preço do litro"></div>`;
+  }
+  const b = $("#btnRota");
+  if (b) b.onclick = async () => {
+    e.carregando = true; e.erro = ""; desenharRota(planoLista());
+    let res = null;
+    try { res = await Rota.calcular(mercados, comparar); } catch (x) { res = {erro: "Não consegui calcular a rota agora. Tente de novo em instantes."}; }
+    if (e.chave !== chave) return;   // a lista mudou enquanto calculava
+    e.carregando = false;
+    if (res.erro) e.erro = res.erro; else e.res = res;
+    desenharRota(planoLista());
+  };
+  const gps = $("#btnRotaGps");
+  if (gps) gps.onclick = () => {
+    if (Rota.casa()?.exata) { try { localStorage.removeItem("ofertas-casa"); } catch {} desenharRota(planoLista()); return; }
+    if (!navigator.geolocation) { e.erro = "Este navegador não informa a localização."; desenharRota(planoLista()); return; }
+    gps.textContent = "Pedindo a localização…";
+    navigator.geolocation.getCurrentPosition(pos => { Rota.guardar("ofertas-casa", {lat: pos.coords.latitude, lon: pos.coords.longitude}); desenharRota(planoLista()); },
+      () => { e.erro = "Não foi possível pegar a localização (a permissão foi negada?). Continuo usando o CEP."; desenharRota(planoLista()); }, {enableHighAccuracy: true, timeout: 15000});
+  };
+  for (const [id, campo] of [["#carroKml", "kml"], ["#carroPreco", "preco"]]) {
+    const inp = $(id);
+    if (inp) inp.onchange = () => { const c = Rota.guardado("ofertas-carro", {}); c[campo] = +inp.value || 0; Rota.guardar("ofertas-carro", c); desenharRota(planoLista()); };
+  }
+}
+
 let calcId = 0;
 async function calcularLista() {
   const itens = Dados.d.lista.filter(i => !precosLista[i.id]?.calculado || calcularLista.forcar);

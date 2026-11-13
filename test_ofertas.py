@@ -583,6 +583,27 @@ class TestInterface(unittest.TestCase):
         self.assertIn('data-modo="dois"', self.html)
         self.assertIn("function melhorDupla(", self.html)
 
+    def test_rota_casa_mercados_casa(self):
+        """A rota usa só serviços grátis e sem chave, e nenhuma chamada pode travar a tela."""
+        self.assertIn('id="rotaLista"', self.html)
+        self.assertIn("api/checkout/pub/pickup-points", self.html, "lojas pelas próprias redes (VTEX)")
+        self.assertIn("nominatim.openstreetmap.org/search", self.html, "lojas pelo nome, para as demais redes")
+        self.assertIn("router.project-osrm.org/trip/v1/driving/", self.html)
+        self.assertIn("routing.openstreetmap.de/routed-car/trip/v1/driving/", self.html, "servidor de reserva")
+        self.assertIn("roundtrip=true&source=first", self.html, "sai de casa e volta para casa")
+        self.assertIn("https://www.google.com/maps/dir/?api=1&origin=", self.html)
+        self.assertIn("function desenharRota(", self.html)
+        self.assertIn("const comPrazo =", self.html)
+        self.assertNotIn("overpass", self.html, "o Overpass ficou de fora: demorava mais de 45 s em São Paulo")
+        self.assertNotIn("key=", self.html.split("google.com/maps/dir")[1][:300], "o link do Google Maps não usa chave")
+
+    def test_site_busca_a_versao_nova_primeiro(self):
+        """O service worker servia a página e os preços da visita anterior; agora é rede primeiro."""
+        with open(os.path.join(self.raiz, "static", "sw.js"), encoding="utf-8") as f:
+            sw = f.read()
+        casca = sw.split("// casca do app e dados do dia")[1]
+        self.assertLess(casca.index("await fetch(req)"), casca.index("caches.match(req)"))
+
     def test_veredito_local_espelha_o_python(self):
         """Se a regra mudar num lado e não no outro, o site e o app discordam."""
         for pedaco in ("MIN_DIAS_JULGAR = 14", 'veredito: "inflada"', 'veredito: "boa"',

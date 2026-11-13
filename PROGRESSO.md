@@ -53,6 +53,26 @@ O `historico.json` cobria 6.000 dos 42 mil produtos, então o gráfico quase nun
 
 Backup em `backups/antes-historico-completo-2026-11-13/`.
 
+## Rota casa, mercados, casa: 13/11/2026 (Claude)
+
+Na aba Lista, o cartão "Rota" usa os mercados do plano da lista (um só ou a dupla) e monta o caminho de ida e volta.
+Tudo no navegador (`Rota` e `desenharRota` em `static/index.html`), com serviços grátis e sem chave:
+
+- **Lojas**: pontos de retirada das redes VTEX (`/api/checkout/pub/pickup-points`, pelo proxy), a lista de lojas do
+  Assaí e, para as demais, a busca por nome do OpenStreetMap (Nominatim), em caixas de 8, 22 e 55 km em volta de casa.
+  A loja achada fica guardada no aparelho por 30 dias (`ofertas-lojas`).
+- **Ordem, km e tempo**: OSRM (`router.project-osrm.org`), com `routing.openstreetmap.de` de reserva e, sem nenhum
+  dos dois, estimativa em linha reta.
+- **Navegação**: link do Google Maps com as paradas e link do Waze por parada.
+- **Combustível**: consumo e preço ficam em `ofertas-carro`; com a lista dividida em 2, mostra se ainda compensa.
+- **Partida**: o centro do CEP, ou a localização do aparelho se o usuário pedir (`ofertas-casa`, só no aparelho).
+- O Overpass foi testado e descartado: em São Paulo passava de 45 s e caía. Toda chamada tem limite de tempo (`comPrazo`).
+
+Junto: o `sw.js` (v3) passou a buscar a rede primeiro. Antes ele entregava a página e os preços da visita anterior
+e só atualizava por trás, então cada mudança demorava uma visita para aparecer.
+
+Backup em `backups/antes-rota-2026-11-13/`.
+
 ## O que foi pedido
 
 O usuário listou 7 ideias para o Ofertas SP e pediu: fazer o que eu achasse melhor, incluir
