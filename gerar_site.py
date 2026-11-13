@@ -11,6 +11,7 @@ Variáveis de ambiente (opcionais):
     OFERTAS_PROXY      endereço do proxy (Cloudflare Worker) que permite busca ao vivo com qualquer CEP
     OFERTAS_SAIDA      pasta de saída (padrão: site/)
 """
+import hashlib
 import json
 import os
 import shutil
@@ -143,7 +144,9 @@ def main():
     colunas = db.CAMPOS
     produtos = db.consultar(limite=10**7)
     gravar("produtos.json", {"colunas": colunas, "linhas": [[p[c] for c in colunas] for p in produtos]})
-    gravar("folhetos.json", [f for f in db.listar_folhetos() if f["mercado"] != "Assaí"])
+    folhetos = [f for f in db.listar_folhetos() if f["mercado"] != "Assaí"]
+    capas_dos_pdfs(folhetos, os.path.join(SAIDA, "dados", "capas"))
+    gravar("folhetos.json", folhetos)
     gravar("assai.json", assai)
     gravar("folhetos-lidos.json", lidos)
     # histórico: só o necessário para o gráfico e o veredito, sem inflar o site.
@@ -203,6 +206,35 @@ def _comprimir_serie(dias):
         else:
             out.append([d, preco])
     return out
+
+
+def capas_dos_pdfs(folhetos, pasta, largura=480):
+    """Folheto em PDF: desenha a primeira página para servir de capa no site (campo "capa").
+    Usa o PyMuPDF; sem ele, ou se um PDF falhar, o site mostra o cartão sem imagem."""
+    pdfs = [f for f in folhetos if f["imagem"].lower().endswith(".pdf")]
+    if not pdfs:
+        return 0
+    try:
+        import pymupdf
+    except ImportError:
+        print("  ! capas dos PDFs: PyMuPDF não instalado; os folhetos em PDF ficam sem capa")
+        return 0
+    os.makedirs(pasta, exist_ok=True)
+    feitas = 0
+    for f in pdfs:
+        try:
+            dados, _ = extrator_ia._baixar(f["imagem"])
+            with pymupdf.open(stream=dados, filetype="pdf") as doc:
+                pagina = doc[0]
+                escala = largura / pagina.rect.width
+                nome = hashlib.sha1(f["imagem"].encode()).hexdigest()[:12] + ".jpg"
+                pagina.get_pixmap(matrix=pymupdf.Matrix(escala, escala)).save(os.path.join(pasta, nome), jpg_quality=72)
+            f["capa"] = "dados/capas/" + nome
+            feitas += 1
+        except Exception as e:
+            print(f"  ! capa de {f['titulo']}: {e}")
+    print(f"Capas de PDF: {feitas} de {len(pdfs)}")
+    return feitas
 
 
 def exportar_historico(dias=90, max_produtos=100000, anteriores=None):

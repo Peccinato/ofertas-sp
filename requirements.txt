@@ -1,1 +1,2 @@
 anthropic>=0.40
+pymupdf>=1.24   # capas dos folhetos em PDF (opcional: sem ele o site mostra um cartao sem imagem)

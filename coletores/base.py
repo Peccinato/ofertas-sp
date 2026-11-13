@@ -60,6 +60,10 @@ def http_json(url, data=None, headers=None, timeout=20):
     return json.loads(http(url, data, headers, timeout))
 
 
+_POR_100G = re.compile(r"cada\s*100\s*g")
+_PARCELA = re.compile(r"(\d+)\s*x\b.*sem juros")
+
+
 @dataclass
 class Produto:
     mercado: str
@@ -78,6 +82,16 @@ class Produto:
     ean: str = ""                      # código de barras, quando a loja informa
 
     def finalizar(self):
+        # folheto com preço "a cada 100g": o "de" lido é o preço do quilo, não um desconto;
+        # parcela ("3x sem juros") lida como preço também não é desconto (mesma regra no index.html)
+        cond = (self.extra or "").lower()
+        por100 = bool(_POR_100G.search(cond))
+        parcela = _PARCELA.search(cond)
+        if self.preco and self.preco_de:
+            if por100 and 9.5 <= self.preco_de / self.preco <= 10.5:
+                self.preco_de = None
+            elif parcela and abs(self.preco * int(parcela.group(1)) - self.preco_de) <= 0.02 * self.preco_de:
+                self.preco, self.preco_de = self.preco_de, None
         if self.preco_de and self.preco_de > self.preco > 0:
             self.desconto = round(100 * (1 - self.preco / self.preco_de))
         else:
@@ -86,6 +100,8 @@ class Produto:
         if qtd and self.preco:
             self.unidade = un
             self.preco_unidade = round(self.preco / qtd, 2)
+        if por100 and self.preco and self.preco <= 30:   # acima disso o preço lido já deve ser o do quilo
+            self.unidade, self.preco_unidade = "kg", round(self.preco * 10, 2)
         return self
 
     def dict(self):

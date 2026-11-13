@@ -564,6 +564,31 @@ class TestColetores(unittest.TestCase):
         finally:
             sites.http_json = original
 
+    def test_preco_por_100g_nao_e_desconto(self):
+        """Folheto com preço "a cada 100g": a IA lia o preço do quilo como preço antigo e saía -90%."""
+        from coletores.base import Produto
+        p = Produto(mercado="Barbosa", nome="Queijo Brie Tirolez", preco=9.99, preco_de=99.9, extra="a cada 100g").finalizar()
+        self.assertEqual((p.preco, p.preco_de, p.desconto), (9.99, None, 0))
+        self.assertEqual((p.preco_unidade, p.unidade), (99.9, "kg"))
+        # preço alto com "a cada 100g" já deve ser o do quilo: não inventa R$ 899/kg
+        caro = Produto(mercado="Barbosa", nome="Salame Aurora", preco=89.9, extra="a cada 100g").finalizar()
+        self.assertIsNone(caro.preco_unidade)
+
+    def test_parcela_nao_e_desconto(self):
+        from coletores.base import Produto
+        p = Produto(mercado="Max Atacadista", nome="Cesta Amor", preco=26.63, preco_de=79.9,
+                    extra="3x cada sem juros no cartão / à vista 79,90 cada").finalizar()
+        self.assertEqual((p.preco, p.preco_de, p.desconto), (79.9, None, 0))
+
+    def test_desconto_normal_continua(self):
+        from coletores.base import Produto
+        p = Produto(mercado="X", nome="Arroz 5kg", preco=20, preco_de=25).finalizar()
+        self.assertEqual((p.desconto, p.preco_unidade, p.unidade), (20, 4.0, "kg"))
+
+    def test_capas_sem_pdf_ou_sem_biblioteca_nao_quebram(self):
+        import gerar_site
+        self.assertEqual(gerar_site.capas_dos_pdfs([{"imagem": "https://x/a.jpg", "titulo": "a"}], "nao-usa"), 0)
+
     def test_gpa_sem_produto_nao_e_falha(self):
         """A loja do Extra sem o produto responde 404 "Products not found" em vez de lista vazia."""
         self.assertEqual(self._gpa_com_erro(404, b'{"message":"Partner error: Products not found"}'), [])
@@ -622,6 +647,21 @@ class TestInterface(unittest.TestCase):
         self.assertIn('x.category === "building"', self.html, "há mercado no mapa cadastrado só como prédio (Roldão)")
         self.assertNotIn("overpass", self.html, "o Overpass ficou de fora: demorava mais de 45 s em São Paulo")
         self.assertNotIn("key=", self.html.split("google.com/maps/dir")[1][:300], "o link do Google Maps não usa chave")
+
+    def test_design_das_seis_areas(self):
+        h = self.html
+        self.assertIn('id="inicio"', h); self.assertIn("function destaquesDoDia(", h)
+        self.assertIn('class="filtros"', h, "filtros das ofertas numa linha só")
+        self.assertIn('class="sem-foto"', h, "produto sem foto ganha a cor e a inicial do mercado")
+        self.assertIn('id="vazioFav"', h); self.assertIn('id="vazioLista"', h)
+        self.assertIn('<details class="lista" id="grupoMercados">', h, "mercados recolhidos na tela Mais")
+        self.assertLess(h.index('data-ir="folhetos"'), h.index('id="grupoMercados"'), "atalhos antes dos mercados")
+        self.assertIn("f.capa ?", h, "folheto em PDF usa a capa gerada na coleta")
+        self.assertIn("data-tirar-fav", h, "dá para tirar um favorito pela aba Favoritos")
+
+    def test_regra_do_desconto_espelha_o_python(self):
+        self.assertIn(r"/cada\s*100\s*g/", self.html)
+        self.assertIn(r"/(\d+)\s*x\b.*sem juros/", self.html)
 
     def test_site_busca_a_versao_nova_primeiro(self):
         """O service worker servia a página e os preços da visita anterior; agora é rede primeiro."""

@@ -7,6 +7,31 @@ sessão) retomar este trabalho, leia isto primeiro e continue daqui.
 
 ---
 
+## Design em seis áreas, 13/11/2026 (Claude)
+
+Pedido do dono, com prévia de antes e depois aprovada:
+
+- **Comparar** deixou de abrir vazia: "Destaques de hoje" (6 ofertas com desconto de 15% a 60%, com foto,
+  uma de cada mercado), "Buscas recentes" (`ofertas-buscas` no aparelho) e "Seus favoritos que baixaram".
+  Funções `desenharInicio`, `destaquesDoDia`, `Recentes`.
+- **Ofertas:** filtros numa linha que rola de lado (`.filtros`); produto sem foto (folheto, ou foto que
+  não carrega) vira um quadrado com a cor e a inicial do mercado (`.sem-foto`).
+- **Desconto falso de -90%:** folheto com preço "a cada 100g" trazia o preço do quilo como "de". A regra
+  fica em `Produto.finalizar` (coletores/base.py) e espelhada em `finalizar` do index.html: sem desconto,
+  e o preço por quilo passa a aparecer. A mesma regra tira o desconto falso de parcela ("3x sem juros").
+- **Favoritos e Lista vazios:** desenho, explicação e botão (`telaVazia`). Na aba Favoritos cada item
+  ganhou "Tirar dos favoritos".
+- **Mais:** atalhos em cima; mercados recolhidos em "Meus mercados" (`<details id="grupoMercados">`).
+- **Folhetos em PDF:** a coleta desenha a primeira página (`capas_dos_pdfs` em gerar_site.py, com PyMuPDF,
+  instalado no workflow) e grava em `dados/capas/`; o folheto leva o campo `capa`. Sem a biblioteca, ou
+  se o PDF falhar, o site mostra um cartão com a cor do mercado.
+- **Topo e sugestões:** CEP virou uma pílula com alfinete e seta; sugestões com lupa, maiúscula e espaço
+  antes da unidade ("Arroz 5 kg"; a busca continua usando "arroz 5kg"); selo "Ao vivo" no aviso.
+  Plurais ("1 favorito"), validade como "até 14/11".
+- `sw.js` foi para v5.
+
+Testes: 78, todos passando. Backup em `backups/2026-11-13-design-6-areas/`.
+
 ## Extra 404 e loja mais perto no mapa, 13/11/2026 (Claude)
 
 - **Extra: "1 falhas, HTTP Error 404" em toda coleta.** Era sempre a busca "pizza congelada": a loja

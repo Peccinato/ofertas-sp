@@ -23,8 +23,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - name: Instalar leitor de folhetos (IA)
-        run: pip install --quiet anthropic
+      - name: Instalar leitor de folhetos (IA) e de PDF (capas)
+        run: pip install --quiet anthropic pymupdf
       - name: Coletar preços e gerar o site
         env:
           PYTHONUNBUFFERED: "1"   # o andamento aparece no registro na hora, não só no fim

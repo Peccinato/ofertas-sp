@@ -16,6 +16,8 @@
     --bg: #f2f2f7; --card: #fff; --txt: #1c1c1e; --sub: #6e6e73; --linha: #e5e5ea; --campo: #e4e4ea;
     --acento: #0a8f5b; --acento-2: #e2f5ec; --sobre-acento: #fff; --verm: #c2410c; --verm-2: #fdece3;
     --barra: rgba(249,249,251,.9); --raio: 14px; --nav: 58px;
+    --alfinete: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 2a7 7 0 0 0-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 0 0-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z'/%3E%3C/svg%3E");
+    --lupa: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-4-4'/%3E%3C/svg%3E");
   }
   @media (prefers-color-scheme: dark) {
     :root { --bg: #000; --card: #1c1c1e; --txt: #f5f5f7; --sub: #98989f; --linha: #2c2c2e; --campo: #1c1c1e;
@@ -31,9 +33,22 @@
   header, main { max-width: 760px; margin: 0 auto; }
   header { padding: 14px 16px 0; }
   .topo { display: flex; align-items: center; gap: 10px; justify-content: space-between; min-height: 22px; }
-  .cep { font: inherit; font-size: 13px; font-weight: 600; padding: 0; border: 0; background: none; color: var(--acento); cursor: pointer; text-align: left; }
-  .cep::after { content: " trocar"; color: var(--sub); font-weight: 400; }
-  .cep.vazio-cep { color: var(--verm); } .cep.vazio-cep::after { content: ""; }
+  .topo { margin-bottom: 8px; }
+  .cep { font: inherit; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; min-width: 0; padding: 6px 12px 6px 9px;
+         border: 0; border-radius: 999px; background: var(--card); color: var(--txt); cursor: pointer; text-align: left; }
+  .cep::before { content: ""; flex: none; width: 14px; height: 14px; background: var(--acento);
+         -webkit-mask: var(--alfinete) center / contain no-repeat; mask: var(--alfinete) center / contain no-repeat; }
+  .cep::after { content: ""; flex: none; width: 6px; height: 6px; margin: -3px 0 0 2px; border: solid var(--sub); border-width: 0 1.6px 1.6px 0; transform: rotate(45deg); }
+  .cep.vazio-cep { color: var(--verm); } .cep.vazio-cep::before { background: var(--verm); }
+  /* sugestões e buscas recentes: pílulas com lupa */
+  #sugestoes .chip, #recentes .chip { display: inline-flex; align-items: center; gap: 7px; font-size: 13.5px; padding: 8px 14px 8px 11px; box-shadow: inset 0 0 0 1px var(--linha); }
+  #sugestoes .chip::before, #recentes .chip::before { content: ""; flex: none; width: 13px; height: 13px; background: var(--sub);
+         -webkit-mask: var(--lupa) center / contain no-repeat; mask: var(--lupa) center / contain no-repeat; }
+  @media (min-width: 900px) { #sugestoes, #recentes { flex-wrap: wrap; overflow: visible; } }
+  .ao-vivo { display: inline-flex; align-items: center; gap: 5px; margin-right: 6px; padding: 2px 8px; border-radius: 99px; background: var(--acento-2); color: var(--acento);
+         font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; vertical-align: 1px; }
+  .ao-vivo::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .tirar-fav { font: inherit; font-size: 12.5px; font-weight: 600; color: var(--verm); background: none; border: 0; padding: 5px 0 0; cursor: pointer; }
   #resumo { color: var(--sub); font-size: 12px; white-space: nowrap; }
   h1 { font-size: 30px; font-weight: 750; margin: 2px 0 0; letter-spacing: -.03em; }
   main { padding: 10px 16px 16px; }
@@ -201,6 +216,32 @@
   .saude { display: grid; gap: 6px; font-size: 13px; }
   .saude .ok { color: var(--acento); } .saude .ruim { color: var(--verm); }
 
+  /* produto sem foto: quadrado com a cor e a inicial do mercado */
+  .item > .sem-foto { width: 46px; height: 46px; border-radius: 10px; flex: none; display: grid; place-items: center; font-weight: 700; font-size: 18px;
+    color: color-mix(in srgb, var(--c) 60%, var(--txt)); background: color-mix(in srgb, var(--c) 20%, var(--card)); }
+  /* filtros numa linha só, que rola de lado */
+  .filtros { display: flex; gap: 8px; margin: 0 -16px 10px; padding: 0 16px; overflow-x: auto; scrollbar-width: none; }
+  .filtros::-webkit-scrollbar { display: none; }
+  .filtros select { flex: none; border-radius: 999px; background: var(--card); font-size: 13.5px; padding: 8px 12px; }
+  /* tela vazia: desenho, explicação e o botão do próximo passo */
+  .vazio-tela { text-align: center; padding: 40px 20px 8px; color: var(--sub); }
+  .vazio-tela:empty { display: none; }
+  .vazio-tela svg { width: 30px; height: 30px; padding: 15px; box-sizing: content-box; border-radius: 50%; background: var(--acento-2);
+    stroke: var(--acento); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+  .vazio-tela b { display: block; color: var(--txt); font-size: 17px; margin: 12px 0 4px; }
+  .vazio-tela p { margin: 0 auto 16px; max-width: 300px; font-size: 14px; }
+  /* início (Comparar antes de buscar) */
+  h2.com-acao { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  h2.com-acao button { font: inherit; font-size: 13px; font-weight: 600; text-transform: none; letter-spacing: 0; color: var(--acento); background: none; border: 0; padding: 0; cursor: pointer; }
+  #inicio .chips { margin-bottom: 0; }
+  /* grupo que abre e fecha (Meus mercados) */
+  details.lista > summary { list-style: none; } details.lista > summary::-webkit-details-marker { display: none; }
+  details.lista > summary .seta { transition: transform .15s; } details.lista[open] > summary .seta { transform: rotate(90deg); }
+  #meusMercados > * { border-top: 1px solid var(--linha); }
+  /* folheto em PDF sem capa: cartão com a cor do mercado */
+  .folheto .pdf { background: linear-gradient(160deg, color-mix(in srgb, var(--cor) 26%, var(--card)), var(--card)); color: var(--txt); font-size: 15px; line-height: 1.25; }
+  .folheto .pdf svg { width: 44px; height: 44px; stroke: color-mix(in srgb, var(--cor) 60%, var(--txt)); fill: none; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+
   dialog { border: 0; border-radius: 20px; background: var(--card); color: var(--txt); padding: 20px; width: min(420px, calc(100vw - 32px)); }
   dialog::backdrop { background: rgba(0,0,0,.45); }
   dialog h3 { margin: 0 0 6px; } dialog input { width: 100%; font-size: 18px; letter-spacing: .05em; margin: 12px 0; background: var(--bg); }
@@ -229,7 +270,7 @@
   <!-- COMPARAR -->
   <section class="painel ativo" id="comparar">
     <form class="barra" id="formBusca">
-      <input type="search" id="q" placeholder="Buscar: arroz 5kg, café 500g, leite…" enterkeyhint="search">
+      <input type="search" id="q" placeholder="Buscar: arroz 5 kg, café 500 g, leite…" enterkeyhint="search">
       <button class="btn">Buscar</button>
     </form>
     <div class="chips" id="sugestoes"></div>
@@ -243,6 +284,7 @@
       </select>
     </div>
     <div class="lista" id="resultado"></div>
+    <div id="inicio"></div>
   </section>
 
   <!-- OFERTAS -->
@@ -251,7 +293,7 @@
       <input type="search" id="qOf" placeholder="Filtrar ofertas…">
       <button class="btn sec" id="btnAtualOf">Atualizar ofertas</button>
     </div>
-    <div class="barra">
+    <div class="filtros">
       <select id="mercadoOf" aria-label="Mercado"><option value="">Todos os mercados</option></select>
       <select id="origemOf" aria-label="Origem"><option value="">Site + folheto</option><option value="site">Só sites</option><option value="folheto">Só folhetos</option></select>
       <select id="ordemOf" aria-label="Ordenar"><option value="desconto">Maior desconto</option><option value="unidade">Menor por kg/L</option><option value="preco">Menor preço</option></select>
@@ -263,19 +305,20 @@
 
   <!-- FAVORITOS -->
   <section class="painel" id="favoritos">
-    <div class="barra">
+    <div class="barra" id="barraFav">
       <select id="ordemFav" aria-label="Ordenar"><option value="nome">Ordem: nome</option><option value="oferta">Em oferta primeiro</option><option value="mercado">Por mercado</option></select>
       <button class="btn sec" id="btnAtualFav">Atualizar preços dos favoritos</button>
     </div>
     <div id="progFav"></div>
     <div class="info" id="infoFav"></div>
     <div class="lista" id="listaFav"></div>
+    <div class="vazio-tela" id="vazioFav"></div>
   </section>
 
   <!-- LISTA DE COMPRAS -->
   <section class="painel" id="lista">
     <form class="barra" id="formLista">
-      <input type="search" id="novoItem" placeholder="Adicionar: arroz 5kg, leite 1L…" enterkeyhint="done">
+      <input type="search" id="novoItem" placeholder="Adicionar: arroz 5 kg, leite 1 L…" enterkeyhint="done">
       <input type="number" id="novaQtd" value="1" min="1" aria-label="Quantidade" style="width:58px;text-align:center">
       <button class="btn" aria-label="Adicionar">+</button>
     </form>
@@ -286,8 +329,9 @@
     <div id="resumoLista"></div>
     <div class="info" id="infoLista"></div>
     <div class="lista" id="itensLista"></div>
+    <div class="vazio-tela" id="vazioLista"></div>
     <div class="rota" id="rotaLista"></div>
-    <div class="chips" style="margin-top:12px">
+    <div class="chips" id="acoesLista" style="margin-top:12px">
       <button class="chip" id="btnModoMercado" type="button">Modo mercado</button>
       <button class="chip so-fora-do-mercado" id="btnWhatsapp" type="button">Mandar no WhatsApp</button>
       <button class="chip so-fora-do-mercado" id="btnCalcLista" type="button">Recalcular preços</button>
@@ -300,9 +344,11 @@
 
   <!-- MAIS -->
   <section class="painel" id="mais">
-    <h2 style="margin-top:6px">Meus mercados</h2>
-    <div class="lista" id="meusMercados"></div>
-    <div class="info" id="infoMercados">Só os mercados ligados entram na busca, nas ofertas e na lista.</div>
+    <div class="lista" style="margin-top:6px">
+      <button class="linha" data-ir="folhetos" type="button"><span class="rot">Folhetos<small>As páginas dos tabloides de cada mercado</small></span><span class="seta">›</span></button>
+      <button class="linha" data-ir="familia" type="button"><span class="rot">Família<small>Lista compartilhada e alertas de preço</small></span><span class="seta">›</span></button>
+      <button class="linha" id="linhaInstalar" type="button"><span class="rot">Instalar no celular<small id="rotInstalar">Abre como um aplicativo, direto da tela inicial</small></span><span class="seta">›</span></button>
+    </div>
 
     <h2>Região</h2>
     <div class="seg" id="regioes" role="tablist" aria-label="Região"></div>
@@ -310,12 +356,12 @@
       <button class="linha" id="linhaCep" type="button"><span class="rot">CEP<small id="rotCep">não informado</small></span><span class="seta">trocar ›</span></button>
     </div>
 
-    <h2>Outros</h2>
-    <div class="lista">
-      <button class="linha" data-ir="folhetos" type="button"><span class="rot">Folhetos<small>As páginas dos tabloides de cada mercado</small></span><span class="seta">›</span></button>
-      <button class="linha" data-ir="familia" type="button"><span class="rot">Família<small>Lista compartilhada e alertas de preço</small></span><span class="seta">›</span></button>
-      <button class="linha" id="linhaInstalar" type="button"><span class="rot">Instalar no celular<small id="rotInstalar">Abre como um aplicativo, direto da tela inicial</small></span><span class="seta">›</span></button>
-    </div>
+    <h2>Mercados</h2>
+    <details class="lista" id="grupoMercados">
+      <summary class="linha"><span class="rot">Meus mercados<small id="rotMercados"></small></span><span class="seta">›</span></summary>
+      <div id="meusMercados"></div>
+    </details>
+    <div class="info" id="infoMercados">Só os mercados ligados entram na busca, nas ofertas e na lista.</div>
     <div class="info" id="infoColeta" style="margin-top:14px"></div>
   </section>
 
@@ -389,7 +435,8 @@ const CORES = {"Pão de Açúcar":"#b5121b","Tenda Atacado":"#e85d04","Atacadão
   "Mambo":"#2b9348","Oba Hortifruti":"#6a994e","Coop":"#1d4e89","Savegnago":"#c1121f","Zaffari":"#7b2cbf",
   "Assaí":"#f77f00","Roldão":"#003f88","Sonda":"#e30613","Swift":"#c8102e","Akki":"#f4a300",
   "Lopes":"#00843d","Max Atacadista":"#e4002b","Carrefour":"#1e5bc6","Barbosa":"#d71920","Extra":"#e2001a"};
-const SUGESTOES = ["arroz 5kg","feijão carioca 1kg","café 500g","leite integral","óleo de soja","açúcar 5kg","ovos","cerveja lata","papel higiênico","sabão em pó"];
+const SUGESTOES = [["Arroz 5 kg","arroz 5kg"],["Feijão carioca 1 kg","feijão carioca 1kg"],["Café 500 g","café 500g"],["Leite integral","leite integral"],["Óleo de soja","óleo de soja"],
+  ["Açúcar 5 kg","açúcar 5kg"],["Ovos","ovos"],["Cerveja em lata","cerveja lata"],["Papel higiênico","papel higiênico"],["Sabão em pó","sabão em pó"]];
 const $ = s => document.querySelector(s);
 const brl = v => v == null ? "" : v.toLocaleString("pt-BR", {style:"currency", currency:"BRL"});
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -563,10 +610,15 @@ function quantidade(nome) {
 }
 function finalizar(p) {
   p.desconto = 0;
+  // folheto com preço "a cada 100g": o "de" lido é o preço do quilo; parcela "3x sem juros" também não é desconto
+  const ex = (p.extra || "").toLowerCase(), por100 = /cada\s*100\s*g/.test(ex), parc = ex.match(/(\d+)\s*x\b.*sem juros/);
+  if (por100 && p.preco_de && p.preco_de / p.preco >= 9.5 && p.preco_de / p.preco <= 10.5) p.preco_de = null;
+  if (parc && p.preco_de && Math.abs(p.preco * parc[1] - p.preco_de) <= 0.02 * p.preco_de) { p.preco = p.preco_de; p.preco_de = null; }
   if (p.preco_de && p.preco_de > p.preco && p.preco > 0) p.desconto = Math.round(100 * (1 - p.preco / p.preco_de));
   else p.preco_de = null;
   const [qtd, un] = quantidade(p.nome);
   p.unidade = qtd && p.preco ? un : ""; p.preco_unidade = qtd && p.preco ? Math.round(p.preco / qtd * 100) / 100 : null;
+  if (por100 && p.preco <= 30) { p.unidade = "kg"; p.preco_unidade = Math.round(p.preco * 1000) / 100; }
   return p;
 }
 const reais = v => "R$ " + v.toFixed(2).replace(".", ",");
@@ -810,6 +862,12 @@ function adicionarNaLista(p, termo) {
     prod: {k, mercado: p.mercado, nome: p.nome}});
   Dados.salvar();
 }
+// "Tirar dos favoritos", na aba Favoritos
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-tirar-fav]"); if (!b) return;
+  Dados.d.favoritos = Dados.d.favoritos.filter(f => f.k !== b.dataset.tirarFav);
+  Dados.salvar(); inicioFavs = null; contadores(); carregarFavoritos();
+});
 // clique nas estrelas / carrinhos de qualquer lista de produtos
 document.addEventListener("click", e => {
   const b = e.target.closest("[data-acao]"); if (!b) return;
@@ -817,6 +875,7 @@ document.addEventListener("click", e => {
   const termo = b.closest("#comparar") ? $("#q").value.trim() : "";
   if (b.dataset.acao === "fav") { alternarFavorito(p, termo); const on = Dados.ehFav(b.dataset.k); b.classList.toggle("on", on); b.textContent = on ? "★ Favorito" : "☆ Favoritar"; }
   if (b.dataset.acao === "lista") { adicionarNaLista(p, termo); b.classList.add("ok"); b.textContent = "✓"; }
+  inicioFavs = null;
   if (b.closest("#favoritos")) carregarFavoritos();
 });
 
@@ -863,6 +922,22 @@ function abrirAba(aba) {
 document.querySelectorAll("nav button").forEach(b => b.onclick = () => abrirAba(b.dataset.aba));
 document.addEventListener("click", e => { const b = e.target.closest("[data-ir]"); if (b) abrirAba(b.dataset.ir); });
 
+// tela vazia: desenho, explicação e o botão do próximo passo
+const ICONE = {estrela: `<path d="M12 3l2.7 5.6 6.1.8-4.5 4.2 1.1 6-5.4-3-5.4 3 1.1-6L3.2 9.4l6.1-.8z"/>`,
+  carrinho: `<path d="M3 4h2.5l2.2 11.5h10.6L20.5 8H7"/><circle cx="9" cy="19.5" r="1.2"/><circle cx="17" cy="19.5" r="1.2"/>`,
+  folha: `<path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4"/><path d="M10 12h5M10 16h5"/>`};
+const telaVazia = (icone, titulo, texto, botao = "") => `<svg viewBox="0 0 24 24" aria-hidden="true">${icone}</svg><b>${titulo}</b><p>${texto}</p>${botao}`;
+document.addEventListener("click", e => { if (e.target.closest("#btnFocoLista")) $("#novoItem").focus(); });
+
+// foto que não carrega vira o quadrado com a cor e a inicial do mercado
+document.addEventListener("error", e => {
+  const img = e.target, it = img.tagName === "IMG" && img.parentElement?.classList.contains("item") ? img.parentElement : null;
+  if (!it) return;
+  const m = (vistos.get(it.dataset.k) || {}).mercado || "", s = document.createElement("span");
+  s.className = "sem-foto"; s.style.setProperty("--c", CORES[m] || "#888"); s.textContent = m[0] || ""; s.setAttribute("aria-hidden", "true");
+  img.replaceWith(s);
+}, true);
+
 function acoesHTML(p) {
   const k = chave(p); vistos.set(k, p);
   const lst = Dados.naLista(k);
@@ -879,11 +954,11 @@ function itemHTML(p, destaque, extraHTML = "") {
     p.desconto > 0 ? `<span class="tag desc">-${Math.round(p.desconto)}%</span>` : "",
     p.origem === "folheto" ? `<span class="tag fol">folheto</span>` : "",
     p.extra ? `<span>${esc(p.extra)}</span>` : "",
-    p.validade ? `<span>${esc(p.validade)}</span>` : "",
+    p.validade ? `<span>${esc(p.validade.replace(/^(\d{4})-(\d{2})-(\d{2})$/, "até $3/$2"))}</span>` : "",
   ].join("");
   const img = p.origem === "folheto" ? "" : esc(p.imagem);
   return `<div class="item" data-k="${esc(k)}">
-    ${img ? `<img loading="lazy" src="${img}" alt="">` : `<img alt="" src="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'/>">`}
+    ${img ? `<img loading="lazy" src="${img}" alt="">` : `<span class="sem-foto" style="--c:${cor}" aria-hidden="true">${esc((p.mercado || "?")[0])}</span>`}
     <div class="corpo-item"><div class="nome">${esc(p.nome)}</div><div class="meta">${tags}</div>${extraHTML}</div>
     <div class="preco">${de}<b>${brl(p.preco)}</b>${unid}</div>${acoesHTML(p)}
     <div class="detalhe"><div class="botoes"><button class="${fav ? "on" : ""}" data-acao="fav" data-k="${esc(k)}" type="button">${fav ? "★ Favorito" : "☆ Favoritar"}</button>
@@ -898,14 +973,15 @@ function ordenar(lista, ordem) {
 }
 
 // ---------- comparar
-$("#sugestoes").innerHTML = SUGESTOES.map(s => `<button class="chip" type="button">${s}</button>`).join("");
-$("#sugestoes").onclick = e => { if (e.target.matches(".chip")) { $("#q").value = e.target.textContent; buscar(); } };
+$("#sugestoes").innerHTML = SUGESTOES.map(([rotulo, termo]) => `<button class="chip" data-q="${termo}" type="button">${rotulo}</button>`).join("");
+$("#sugestoes").onclick = e => { const c = e.target.closest(".chip"); if (c) { $("#q").value = c.dataset.q; buscar(); } };
 $("#formBusca").onsubmit = e => { e.preventDefault(); buscar(); };
 $("#ordem").onchange = desenharBusca;
 
 async function buscar(forcar) {
   const q = $("#q").value.trim(); if (!q) return;
-  $("#infoBusca").textContent = "Buscando em todas as redes…"; $("#resultado").innerHTML = ""; $("#avisoBusca").innerHTML = "";
+  $("#infoBusca").textContent = "Buscando em todas as redes…"; $("#resultado").innerHTML = ""; $("#avisoBusca").innerHTML = ""; $("#inicio").innerHTML = "";
+  Recentes.por(q);
   const r = await apiFetch(`/api/buscar?q=${encodeURIComponent(q)}${forcar ? "&forcar=1" : ""}`).then(r => r.json());
   if (r.erro) { $("#infoBusca").textContent = "Erro: " + r.erro; return; }
   estado.produtos = r.produtos;
@@ -924,10 +1000,11 @@ function desenharBusca() {
   const lista = ordenar(todos.filter(p => !estado.ocultos.has(p.mercado)), $("#ordem").value);
   if (todos.length || $("#q").value.trim()) $("#infoBusca").innerHTML = todos.length
     ? `${lista.length} produtos · <a href="#" id="refazer">buscar de novo</a>`
-    : "Nada encontrado. Tente um termo mais simples (ex.: “arroz” em vez de “arroz tipo 1 5kg camil”).";
+    : "Nada encontrado. Tente um termo mais simples (por exemplo, “arroz” em vez de “arroz tipo 1 5 kg Camil”).";
   const ref = $("#refazer"); if (ref) ref.onclick = e => { e.preventDefault(); buscar(true); };
   $("#resultado").innerHTML = lista.slice(0, 300).map((p, i) => itemHTML(p, i === 0)).join("");
   enriquecerHistorico("#resultado");
+  desenharInicio();
 }
 // filtro de mercados: o primeiro toque mostra só aquele mercado; os seguintes somam ou tiram; "Todos" limpa
 $("#filtroMercados").onclick = e => {
@@ -942,6 +1019,43 @@ $("#filtroMercados").onclick = e => {
   desenharBusca();
 };
 
+// ---------- início: o que aparece em Comparar antes de buscar (buscas recentes, quedas nos favoritos, destaques do dia)
+const Recentes = {
+  ler() { try { return JSON.parse(localStorage.getItem("ofertas-buscas") || "[]"); } catch { return []; } },
+  por(q) { try { localStorage.setItem("ofertas-buscas", JSON.stringify([q, ...this.ler().filter(x => semAcento(x) !== semAcento(q))].slice(0, 8))); } catch {} },
+};
+let inicioOfertas = null, inicioFavs = null, infoInicial = "";
+// desconto que dá para acreditar (15% a 60%), com foto, um mercado de cada vez
+function destaquesDoDia(n = 6) {
+  const porM = {};
+  (inicioOfertas || []).filter(p => Regiao.tem(p.mercado) && p.origem !== "folheto" && p.imagem && p.desconto >= 15 && p.desconto <= 60)
+    .sort((a, b) => b.desconto - a.desconto).forEach(p => (porM[p.mercado] ||= []).push(p));
+  const filas = Object.values(porM), out = [];
+  for (let i = 0; out.length < n && filas.some(f => f[i]); i++) for (const f of filas) if (f[i] && out.length < n) out.push(f[i]);
+  return out;
+}
+async function desenharInicio() {
+  const el = $("#inicio");
+  if (estado.produtos.length || $("#q").value.trim()) { el.innerHTML = ""; return; }
+  if (!inicioOfertas) inicioOfertas = (await apiFetch("/api/ofertas?mercado=&origem=").then(r => r.json()).catch(() => ({}))).produtos || [];
+  const favs = Dados.d.favoritos;
+  if (favs.length && !inicioFavs) inicioFavs = await apiFetch("/api/favoritos/precos", {method: "POST", body: JSON.stringify({favoritos: favs})}).then(r => r.json()).catch(() => ({}));
+  if (estado.produtos.length || $("#q").value.trim()) return;   // a pessoa buscou enquanto isto carregava
+  const rec = Recentes.ler(), dest = destaquesDoDia();
+  const quedas = favs.map(f => ({f, atual: (inicioFavs || {})[f.k]?.atual})).filter(x => x.atual && Regiao.tem(x.atual.mercado) && x.f.preco && x.atual.preco < x.f.preco - 0.005);
+  el.innerHTML = (rec.length ? `<h2>Buscas recentes</h2><div class="chips" id="recentes">${rec.map(q => `<button class="chip" type="button">${esc(q)}</button>`).join("")}</div>` : "")
+    + (quedas.length ? `<h2 class="com-acao">Seus favoritos que baixaram <button data-ir="favoritos" type="button">Ver todos ›</button></h2><div class="lista">${quedas.slice(0, 4).map(({f, atual}) =>
+        itemHTML(atual, false, `<div class="var-down">▼ caiu ${brl(f.preco - atual.preco)} desde ${f.em.split("-").reverse().join("/")}</div>`)).join("")}</div>` : "")
+    + (dest.length ? `<h2 class="com-acao">Destaques de hoje <button data-ir="ofertas" type="button">Ver todas ›</button></h2><div class="lista">${dest.map(p => itemHTML(p)).join("")}</div>` : "");
+  enriquecerHistorico("#inicio");
+}
+$("#inicio").addEventListener("click", e => { const c = e.target.closest("#recentes .chip"); if (c) { $("#q").value = c.textContent; buscar(); } });
+// apagou a busca: volta para o início
+$("#q").addEventListener("input", () => {
+  if ($("#q").value.trim() || !estado.produtos.length) return;
+  estado.produtos = []; estado.ocultos.clear(); desenharBusca(); $("#infoBusca").innerHTML = infoInicial;
+});
+
 // ---------- ofertas
 let ofertas = [];
 async function carregarOfertas() {
@@ -954,7 +1068,7 @@ function desenharOfertas() {
   let lista = ofertas.filter(p => Regiao.tem(p.mercado) && (!q || (p.nome_busca || "").includes(q)));
   lista = ordenar(lista, $("#ordemOf").value);
   $("#infoOf").textContent = ofertas.length
-    ? `${lista.length} ofertas (produtos com desconto, promoção ou vindos de folheto).`
+    ? `${lista.length} ${lista.length === 1 ? "oferta" : "ofertas"}: produtos com desconto, em promoção ou vindos de folheto.`
     : "Nenhuma oferta salva ainda. Clique em “Atualizar ofertas” para varrer uma cesta de ~40 itens em todas as redes (leva 1–3 min).";
   $("#listaOf").innerHTML = lista.slice(0, 400).map(p => itemHTML(p)).join("");
   enriquecerHistorico("#listaOf");
@@ -987,7 +1101,9 @@ function desenharFolhetos() {
     const cards = lista.map(f => {
       const st = f.status === "lido" ? `<span class="tag fol">${f.n_itens} produtos lidos</span>`
                : f.status === "erro" ? `<span class="tag desc" title="${esc(f.erro)}">erro na leitura</span>` : `<span class="meta">ainda não lido</span>`;
-      const capa = /\.pdf$/i.test(f.imagem) ? `<div class="pdf">PDF<small>${esc(f.titulo)}</small></div>` : `<img loading="lazy" src="${esc(f.imagem)}" alt="">`;
+      const capa = f.capa ? `<img loading="lazy" src="${esc(f.capa)}" alt="">`
+                 : /\.pdf$/i.test(f.imagem) ? `<div class="pdf"><svg viewBox="0 0 24 24" aria-hidden="true">${ICONE.folha}</svg>${esc(f.titulo)}<small>Toque para abrir o PDF</small></div>`
+                 : `<img loading="lazy" src="${esc(f.imagem)}" alt="">`;
       return `<div class="folheto"><a href="${esc(f.imagem)}" target="_blank" rel="noopener">${capa}</a>
         <div><b>${esc(f.titulo)}</b>${f.pagina > 1 || lista.filter(x => x.titulo === f.titulo).length > 1 ? ` · pág. ${f.pagina}` : ""}
         ${f.loja ? `<div class="meta">${esc(f.loja)}</div>` : ""}<div class="meta">${esc(f.validade)}</div><div class="meta">${st}</div></div></div>`;
@@ -1026,10 +1142,11 @@ $("#btnLerFol").onclick = async () => {
 const custo = p => p.preco_unidade ?? p.preco;
 async function carregarFavoritos() {
   const favs = Dados.d.favoritos;
-  if (!favs.length) {
-    $("#infoFav").textContent = "Nenhum favorito ainda. Toque num produto (em Comparar ou Ofertas) e depois em “☆ Favoritar” para acompanhar o preço dele aqui.";
-    $("#listaFav").innerHTML = ""; return;
-  }
+  $("#barraFav").hidden = !favs.length;
+  $("#vazioFav").innerHTML = favs.length ? "" : telaVazia(ICONE.estrela, "Nenhum favorito ainda",
+    "Toque num produto e depois em “☆ Favoritar” para acompanhar o preço dele aqui.",
+    `<button class="btn" data-ir="comparar" type="button">Buscar um produto</button>`);
+  if (!favs.length) { $("#infoFav").textContent = ""; $("#listaFav").innerHTML = ""; return; }
   $("#infoFav").textContent = "Carregando preços…";
   const r = await apiFetch("/api/favoritos/precos", {method: "POST", body: JSON.stringify({favoritos: favs})}).then(r => r.json());
   let linhas = favs.map(f => ({f, ...(r[f.k] || {})}));
@@ -1038,7 +1155,7 @@ async function carregarFavoritos() {
   else if (ord === "mercado") linhas.sort((a, b) => a.f.mercado.localeCompare(b.f.mercado) || a.f.nome.localeCompare(b.f.nome));
   else linhas.sort((a, b) => a.f.nome.localeCompare(b.f.nome));
   const emOferta = linhas.filter(l => l.atual?.desconto > 0).length;
-  $("#infoFav").textContent = `${favs.length} favoritos${emOferta ? ` · ${emOferta} em oferta agora` : ""}. Os preços vêm da última busca; use “Atualizar preços” para buscar de novo.`;
+  $("#infoFav").textContent = `${favs.length} ${favs.length === 1 ? "favorito" : "favoritos"}${emOferta ? ` · ${emOferta} em oferta agora` : ""}. Os preços vêm da última busca; use “Atualizar preços” para buscar de novo.`;
   $("#listaFav").innerHTML = linhas.map(({f, atual, alternativa}) => {
     const p = atual || {mercado: f.mercado, nome: f.nome, url: f.url, imagem: f.imagem, preco: f.preco, origem: "site"};
     let extra = "";
@@ -1051,6 +1168,7 @@ async function carregarFavoritos() {
       const u = alternativa.preco_unidade && atual?.preco_unidade ? `${brl(alternativa.preco_unidade)}/${alternativa.unidade}` : brl(alternativa.preco);
       extra += `<div class="fav-alt">💡 Parecido mais barato: <b>${u}</b> no ${esc(alternativa.mercado)} — <a href="${esc(alternativa.url)}" target="_blank" rel="noopener">${esc(alternativa.nome)}</a></div>`;
     }
+    extra += `<button class="tirar-fav" data-tirar-fav="${esc(f.k)}" type="button">Tirar dos favoritos</button>`;
     return itemHTML(p, false, extra);
   }).join("");
   enriquecerHistorico("#listaFav");
@@ -1433,7 +1551,10 @@ function desenharLista() {
   const itens = Dados.d.lista, plano = planoLista();
   document.querySelectorAll("#modoLista button").forEach(b => { b.classList.toggle("ativo", b.dataset.modo === modoLista); b.setAttribute("aria-selected", b.dataset.modo === modoLista); });
   $("#modoLista").hidden = !itens.length;
-  $("#infoLista").textContent = itens.length ? "" : "Lista vazia. Adicione itens acima ou toque no + de qualquer produto.";
+  $("#infoLista").textContent = ""; $("#acoesLista").hidden = !itens.length;
+  $("#vazioLista").innerHTML = itens.length ? "" : telaVazia(ICONE.carrinho, "Sua lista está vazia",
+    "Escreva o que precisa comprar ou toque no + de qualquer produto. O site mostra em qual mercado a lista sai mais barata.",
+    `<button class="btn" id="btnFocoLista" type="button">Adicionar um item</button>`);
   const linha = (i, mercado) => {
     const pr = precosLista[i.id] || {}, c = mercado ? plano.custos.get(i.id)?.[mercado] : null;
     const usado = c ? c.p : (pr.fixo || pr.melhor);
@@ -1790,7 +1911,8 @@ function desenharMais() {
     <span class="rot">${esc(m)}${online.has(m) ? "" : "<small>só folheto</small>"}</span>
     <input class="chave" type="checkbox" role="switch" data-m="${esc(m)}"${Regiao.desligados.has(m) ? "" : " checked"}></label>`).join("");
   const lig = ms.filter(m => !Regiao.desligados.has(m)).length;
-  $("#infoMercados").textContent = !ms.length ? "" : lig === ms.length ? "Desligue os mercados que você não frequenta: só os ligados entram na busca, nas ofertas e na lista."
+  $("#rotMercados").textContent = lig === ms.length ? `Todos os ${ms.length} ligados` : `${lig} de ${ms.length} ligados`;
+  $("#infoMercados").textContent = !ms.length ? "" : lig === ms.length ? "Abra para desligar os mercados que você não frequenta: só os ligados entram na busca, nas ofertas e na lista."
     : lig ? `${lig} de ${ms.length} ligados. Só eles entram na busca, nas ofertas e na lista.` : "Todos desligados: ligue pelo menos um mercado para ver preços.";
 }
 $("#meusMercados").onchange = e => {
@@ -1855,15 +1977,16 @@ function acompanhar() { if (!timer) timer = setInterval(status, 1500); status();
 (async () => {
   await Estatico.iniciar();
   if (AoVivo.ativo) {
-    $("#infoBusca").textContent = "Busca ao vivo nas lojas online, com os preços do seu CEP. Folhetos e Ofertas são atualizados todo dia.";
+    $("#infoBusca").innerHTML = `<span class="ao-vivo">Ao vivo</span>Preços das lojas online para o seu CEP. Folhetos e ofertas são atualizados todos os dias.`;
   } else if (Estatico.ativo && Estatico.meta.gerado_em) {
     const d = new Date(Estatico.meta.gerado_em);
-    $("#infoBusca").textContent = `Preços coletados em ${d.toLocaleDateString("pt-BR")} às ${d.toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}. Atualiza sozinho todo dia.`;
+    $("#infoBusca").textContent = `Preços coletados em ${d.toLocaleDateString("pt-BR")} às ${d.toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}. O site se atualiza sozinho todos os dias.`;
   }
   if (Estatico.ativo && Estatico.meta.gerado_em) {
     const d = new Date(Estatico.meta.gerado_em);
-    $("#infoColeta").textContent = `Preços coletados em ${d.toLocaleDateString("pt-BR")} às ${d.toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}. A coleta roda sozinha todo dia.`;
+    $("#infoColeta").textContent = `Preços coletados em ${d.toLocaleDateString("pt-BR")} às ${d.toLocaleTimeString("pt-BR", {hour: "2-digit", minute: "2-digit"})}. A coleta roda sozinha todos os dias.`;
   }
+  infoInicial = $("#infoBusca").innerHTML;
   await Dados.carregar();
   // família: se este aparelho já entrou numa, pega a versão mais nova antes de desenhar a lista
   if (Familia.codigo) await Familia.sincronizar();
@@ -1875,7 +1998,7 @@ function acompanhar() { if (!timer) timer = setInterval(status, 1500); status();
   }).catch(() => {});
   const s = await status();
   montarLojasAssai(s);
-  desenharRegioes(); montarMercadosOf(); desenharMais();
+  desenharRegioes(); montarMercadosOf(); desenharMais(); desenharInicio();
   if (s.trabalho.tarefa && !s.trabalho.fim) acompanhar();
   // de tempos em tempos, busca a lista da família de novo (alguém marcou "leite" no mercado)
   setInterval(() => { if (Familia.codigo && !document.hidden) Familia.sincronizar(); }, 20000);
