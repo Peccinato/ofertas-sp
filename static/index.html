@@ -1545,16 +1545,17 @@ const Rota = {
     for (const g of [0.07, 0.2, 0.5]) {   // ~8 km, ~22 km, ~55 km
       const caixa = [casa.lon - g, casa.lat + g, casa.lon + g, casa.lat - g].join(",");
       const d = await comPrazo(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(busca)}&format=jsonv2&limit=40&bounded=1&addressdetails=1&viewbox=${caixa}`).then(r => r.json());
-      const lojas = (d || []).filter(x => x.category === "shop" && /supermarket|wholesale|greengrocer|butcher|frozen_food/.test(x.type) && serve(x.name || ""))
+      // loja marcada como loja ou só como prédio (há mercado no mapa cadastrado como "prédio comercial"); praça e rua com o mesmo nome ficam de fora
+      const lojas = (d || []).filter(x => ((x.category === "shop" && /supermarket|wholesale|greengrocer|butcher|frozen_food/.test(x.type)) || x.category === "building") && serve(x.name || ""))
         .map(x => ({nome: x.name, lat: +x.lat, lon: +x.lon, endereco: [x.address?.road, x.address?.house_number].filter(Boolean).join(", ") + (x.address?.suburb ? " · " + x.address.suburb : "")}));
-      if (lojas.length) return lojas;
-      await pausa(1100);   // o serviço pede no máximo uma consulta por segundo
+      if (lojas.length) return lojas.sort((a, b) => this.km(casa, a) - this.km(casa, b));
+      await pausa(1100);  // o serviço pede no máximo uma consulta por segundo
     }
     return [];
   },
   // a loja mais perto de casa para uma rede (guardada no aparelho por 30 dias: loja não muda de lugar)
   async loja(mercado, casa) {
-    const k = `${mercado}@${casa.lat.toFixed(2)},${casa.lon.toFixed(2)}`, cache = this.guardado("ofertas-lojas", {});
+    const k = `${mercado}@${casa.lat.toFixed(2)},${casa.lon.toFixed(2)}`, cache = this.guardado("ofertas-lojas2", {});
     if (cache[k] && Date.now() - cache[k].t < 30 * 864e5) return cache[k].l;
     let lojas = [], fonte = "";
     try {
@@ -1564,7 +1565,7 @@ const Rota = {
     lojas = lojas.filter(l => this.km(casa, l) < 60);
     if (!lojas.length) { try { lojas = await this.lojasOsm(mercado, casa); fonte = "mapa"; } catch {} }
     const l = lojas.map(x => ({...x, mercado, fonte, km: this.km(casa, x)})).sort((a, b) => a.km - b.km)[0] || null;
-    if (l) { cache[k] = {t: Date.now(), l}; this.guardar("ofertas-lojas", cache); }
+    if (l) { cache[k] = {t: Date.now(), l}; this.guardar("ofertas-lojas2", cache); }
     return l;
   },
   // melhor ordem das paradas, km e minutos de ida e volta

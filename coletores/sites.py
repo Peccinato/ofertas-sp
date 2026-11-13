@@ -1,6 +1,7 @@
 """Coletores que buscam preços direto nas lojas online das redes."""
 import html
 import re
+import urllib.error
 from urllib.parse import quote
 
 from .base import Produto, http, http_json
@@ -55,11 +56,24 @@ def buscar_vtex(mercado, host, termo, n=24):
     return out
 
 
+def _corpo(erro):
+    try:
+        return erro.read().decode("utf-8", "replace")
+    except Exception:
+        return ""
+
+
 def buscar_gpa(mercado, termo, n=24):
     rede, loja_padrao, chave_regiao = GPA[mercado]
     body = {"terms": termo, "page": 1, "sortBy": "relevance", "resultsPerPage": n, "allowRedirect": False,
             "storeId": REGIAO[chave_regiao] or loja_padrao, "department": "ecom", "customerPlus": True, "partner": "linx"}
-    d = http_json(f"https://api.vendas.gpa.digital/{rede}/search/search", body)
+    try:
+        d = http_json(f"https://api.vendas.gpa.digital/{rede}/search/search", body)
+    except urllib.error.HTTPError as e:
+        # a loja sem o produto responde 404 "Products not found" em vez de uma lista vazia: não é falha
+        if e.code == 404 and "not found" in _corpo(e).lower():
+            return []
+        raise
     out = []
     for p in d.get("products", []):
         if not p.get("stock") or not p.get("price"):

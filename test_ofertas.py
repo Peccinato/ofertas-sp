@@ -550,6 +550,31 @@ class TestColetores(unittest.TestCase):
             sites.http_json = original
         self.assertIn("allowRedirect=false", vistos[0])
 
+    def _gpa_com_erro(self, codigo, corpo):
+        import io
+        import urllib.error
+        from coletores import sites
+
+        def falha(url, *a, **k):
+            raise urllib.error.HTTPError(url, codigo, "erro", {}, io.BytesIO(corpo))
+        original = sites.http_json
+        sites.http_json = falha
+        try:
+            return sites.buscar_gpa("Extra", "pizza congelada")
+        finally:
+            sites.http_json = original
+
+    def test_gpa_sem_produto_nao_e_falha(self):
+        """A loja do Extra sem o produto responde 404 "Products not found" em vez de lista vazia."""
+        self.assertEqual(self._gpa_com_erro(404, b'{"message":"Partner error: Products not found"}'), [])
+
+    def test_gpa_outros_erros_continuam_aparecendo(self):
+        import urllib.error
+        with self.assertRaises(urllib.error.HTTPError):
+            self._gpa_com_erro(500, b"erro interno")
+        with self.assertRaises(urllib.error.HTTPError):
+            self._gpa_com_erro(404, b"<html>pagina sumiu</html>")
+
 
 class TestInterface(unittest.TestCase):
     """O index.html é um arquivo só: estes testes pegam erro de sintaxe e peça faltando."""
@@ -594,6 +619,7 @@ class TestInterface(unittest.TestCase):
         self.assertIn("https://www.google.com/maps/dir/?api=1&origin=", self.html)
         self.assertIn("function desenharRota(", self.html)
         self.assertIn("const comPrazo =", self.html)
+        self.assertIn('x.category === "building"', self.html, "há mercado no mapa cadastrado só como prédio (Roldão)")
         self.assertNotIn("overpass", self.html, "o Overpass ficou de fora: demorava mais de 45 s em São Paulo")
         self.assertNotIn("key=", self.html.split("google.com/maps/dir")[1][:300], "o link do Google Maps não usa chave")
 

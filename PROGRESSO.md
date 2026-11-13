@@ -1,11 +1,27 @@
 # Estado da sessão — Ofertas SP
 
-Última atualização: 2026-11-12 (America/Sao_Paulo)
+Última atualização: 2026-11-13 (America/Sao_Paulo)
 
 Este arquivo existe para a sessão poder ser compactada sem perder o fio. Se você (ou outra
 sessão) retomar este trabalho, leia isto primeiro e continue daqui.
 
 ---
+
+## Extra 404 e loja mais perto no mapa, 13/11/2026 (Claude)
+
+- **Extra: "1 falhas, HTTP Error 404" em toda coleta.** Era sempre a busca "pizza congelada": a loja
+  do Extra da região (2180) não tem o produto e a API do GPA responde 404 "Products not found" em vez
+  de lista vazia. `buscar_gpa` agora trata esse 404 como "nenhum produto"; qualquer outro erro
+  (500, 404 sem essa mensagem) continua contando como falha.
+- **Rota não pegava o Roldão mais perto.** O Roldão da Av. General Ataliba Leonel (8 km da Paulista)
+  está no OpenStreetMap como `building/retail`, não como `shop`. `lojasOsm` passou a aceitar também
+  `building` quando o nome bate com a rede (praça e rua com o mesmo nome continuam de fora).
+  O cache das lojas no aparelho mudou de nome (`ofertas-lojas2`) para não ficar 30 dias com a loja
+  antiga; `sw.js` foi para v4.
+- **Limite que continua:** o mapa tem só 3 Roldão perto da capital; a rede tem 37 lojas no estado
+  (`roldao.com.br/wp-json/wp/v2/lojas-contato` dá os nomes, mas não os endereços).
+
+Testes: 72, todos passando. Backup em `backups/2026-11-13-extra404-roldao/`.
 
 ## Correções de 12/11/2026 (Claude)
 
