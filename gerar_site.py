@@ -168,38 +168,64 @@ def main():
         sys.exit("Nenhum preço coletado; não publicar.")
 
 
-def exportar_historico(dias=120, max_produtos=6000, anteriores=None):
-    """Histórico enxuto para o site estático.
+def _dia_num(x):
+    """Dia como número (dias desde 1970). O formato antigo guardava segundos."""
+    x = int(x)
+    return x // 86400 if x > 10 ** 6 else x
 
-    Formato compacto de propósito: {chave: [[dia_epoch, preco], ...]}, um ponto por dia. O site
-    publicado já carrega 11 MB de catálogo; por isso o histórico tem teto de produtos e de dias.
+
+def _expandir_serie(serie):
+    """Série compacta -> {dia: preço}, um por dia. Entre dois pontos de mesmo preço, o preço valeu
+    em todos os dias do meio."""
+    dias, ant = {}, None
+    for p in serie if isinstance(serie, list) else []:
+        try:
+            d, preco = _dia_num(p[0]), round(float(p[1]), 2)
+        except (TypeError, ValueError, IndexError):
+            continue
+        if preco <= 0:
+            continue
+        if ant and ant[1] == preco and d > ant[0]:
+            for k in range(ant[0] + 1, d):
+                dias[k] = preco
+        dias[d] = preco
+        ant = (d, preco)
+    return dias
+
+
+def _comprimir_serie(dias):
+    """{dia: preço} -> [[dia, preço], ...] só com o primeiro e o último dia de cada preço seguido."""
+    out = []
+    for d in sorted(dias):
+        preco = dias[d]
+        if len(out) >= 2 and out[-1][1] == preco and out[-2][1] == preco:
+            out[-1][0] = d          # o preço continua o mesmo: só estica o fim
+        else:
+            out.append([d, preco])
+    return out
+
+
+def exportar_historico(dias=90, max_produtos=100000, anteriores=None):
+    """Histórico de todos os produtos para o site estático.
+
+    Formato: {chave: [[dia, preco], ...]}, com `dia` em dias desde 1970. Para caber todo o catálogo
+    (mais de 40 mil produtos), a série só guarda as MUDANÇAS: o primeiro e o último dia de cada
+    preço seguido. Um produto que ficou 30 dias no mesmo preço ocupa 2 pontos, não 30. O site
+    desfaz isso (expandirSerie) antes de desenhar o gráfico e de julgar a oferta.
 
     `anteriores` é o historico.json do site publicado. O GitHub Actions roda em máquina limpa, sem
     banco de histórico: cada execução só conhece o dia de hoje. Por isso os dias já publicados são
     SOMADOS aos do banco, produto a produto (no mesmo dia, vale o banco). O site publicado é, ele
     mesmo, o arquivo de longo prazo.
     """
+    import calendar
     import historico as hist
     anteriores = anteriores if isinstance(anteriores, dict) else {}
-    corte = time.time() - dias * 86400
-    desde = time.strftime("%Y-%m-%d", time.localtime(corte))
+    hoje_num = calendar.timegm(time.strptime(time.strftime("%Y-%m-%d"), "%Y-%m-%d")) // 86400
+    corte = hoje_num - dias
+    desde = time.strftime("%Y-%m-%d", time.localtime(time.time() - dias * 86400))
 
-    def dia_de(ep):
-        return time.strftime("%Y-%m-%d", time.localtime(ep))
-
-    def limpar(serie):
-        """Pontos válidos e dentro da janela, como {dia: [epoch, preco]}."""
-        pontos = {}
-        for p in serie if isinstance(serie, list) else []:
-            try:
-                ep, preco = int(p[0]), round(float(p[1]), 2)
-            except (TypeError, ValueError, IndexError):
-                continue
-            if ep >= corte - 86400 and preco > 0:
-                pontos[dia_de(ep)] = [ep, preco]
-        return pontos
-
-    banco = {}   # chave -> {dia: [epoch, preco]}
+    banco = {}   # chave -> {dia: preco}
     try:
         hist.criar()
         with hist.conectar() as con:
@@ -209,24 +235,24 @@ def exportar_historico(dias=120, max_produtos=6000, anteriores=None):
             """, (desde,)).fetchall()
         for r in rows:
             try:
-                ep = int(time.mktime(time.strptime(r["dia"], "%Y-%m-%d")))
+                d = calendar.timegm(time.strptime(r["dia"], "%Y-%m-%d")) // 86400
             except ValueError:
                 continue
-            banco.setdefault(f"{r['mercado']}|{r['nome']}", {})[r["dia"]] = [ep, round(r["preco"], 2)]
+            banco.setdefault(f"{r['mercado']}|{r['nome']}", {})[d] = round(r["preco"], 2)
     except Exception as e:   # noqa: BLE001
         print("  ! histórico indisponível:", e)
 
     # soma o publicado com o banco: o passado é preservado e o dia novo entra (ou corrige o mesmo dia)
     series, continuados = {}, 0
     for k in set(banco) | set(anteriores):
-        pontos = limpar(anteriores.get(k))
+        pontos = {d: v for d, v in _expandir_serie(anteriores.get(k)).items() if d >= corte}
         if pontos and k in banco:
             continuados += 1
         pontos.update(banco.get(k, {}))
         if pontos:
-            series[k] = [pontos[d] for d in sorted(pontos)]
+            series[k] = pontos
 
-    # teto de produtos: primeiro quem já tem mais dias (a série não pode ser interrompida);
+    # teto de segurança: primeiro quem tem mais dias (a série não pode ser interrompida);
     # no empate, um de cada mercado por vez, para nenhuma rede ficar de fora
     if len(series) > max_produtos:
         por_mercado = {}
@@ -240,11 +266,11 @@ def exportar_historico(dias=120, max_produtos=6000, anteriores=None):
                     ordem.append(f.pop(0))
             filas = [f for f in filas if f]
         series = {k: series[k] for k in ordem}
-    out = {k: series[k] for k in sorted(series)}
+    out = {k: _comprimir_serie(series[k]) for k in sorted(series)}
     if continuados:
         print(f"Histórico: {continuados} produtos continuam a série do site publicado")
-    print(f"Histórico exportado: {len(out)} produtos, {sum(len(v) for v in out.values())} pontos, "
-          f"até {max((len(v) for v in out.values()), default=0)} dias por produto")
+    print(f"Histórico exportado: {len(out)} produtos, até {max((len(v) for v in series.values()), default=0)} dias por produto, "
+          f"{sum(len(v) for v in out.values())} pontos guardados (de {sum(len(v) for v in series.values())} dias observados)")
     return out
 
 

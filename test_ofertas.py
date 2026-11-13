@@ -425,10 +425,44 @@ class TestExportacao(BaseComBancos):
 
     @staticmethod
     def _dias_atras(n, preco):
-        """Ponto no formato publicado: [epoch da meia-noite de n dias atrás, preço]."""
+        """Ponto no formato publicado: [dia (dias desde 1970) de n dias atrás, preço]."""
+        import calendar
         import time
         dia = time.strftime("%Y-%m-%d", time.localtime(time.time() - n * 86400))
-        return [int(time.mktime(time.strptime(dia, "%Y-%m-%d"))), preco]
+        return [calendar.timegm(time.strptime(dia, "%Y-%m-%d")) // 86400, preco]
+
+    def test_preco_parado_ocupa_dois_pontos(self):
+        """Todo o catálogo só cabe porque a série guarda as mudanças, não todos os dias."""
+        import gerar_site
+        self.serie("Covabra", "Café", [10.0] * 30 + [12.0] * 5)
+        pontos = gerar_site.exportar_historico()["Covabra|Café"]
+        self.assertEqual([p[1] for p in pontos], [10.0, 10.0, 12.0, 12.0])
+        self.assertEqual(pontos[1][0] - pontos[0][0], 29)
+        self.assertEqual(len(gerar_site._expandir_serie(pontos)), 35, "expandir devolve um preço por dia")
+
+    def test_serie_compacta_continua_no_dia_seguinte(self):
+        """O publicado já vem compacto; o dia novo estica o fim do preço ou abre um preço novo."""
+        import gerar_site
+        anterior = {"Covabra|Café": [self._dias_atras(9, 10.0), self._dias_atras(1, 10.0)]}
+        self.serie("Covabra", "Café", [10.0], dias_atras=[0])
+        mesmo = gerar_site.exportar_historico(anteriores=anterior)["Covabra|Café"]
+        self.assertEqual(mesmo, [self._dias_atras(9, 10.0), self._dias_atras(0, 10.0)])
+        self.serie("Covabra", "Chá", [8.0], dias_atras=[0])
+        mudou = gerar_site.exportar_historico(
+            anteriores={"Covabra|Chá": [self._dias_atras(9, 7.0), self._dias_atras(1, 7.0)]})["Covabra|Chá"]
+        self.assertEqual([p[1] for p in mudou], [7.0, 7.0, 8.0])
+
+    def test_aceita_o_formato_antigo_em_segundos(self):
+        import gerar_site
+        dia = self._dias_atras(1, 0)[0]
+        h = gerar_site.exportar_historico(anteriores={"Assaí|Arroz": [[dia * 86400, 20.0]]})
+        self.assertEqual(h, {"Assaí|Arroz": [[dia, 20.0]]})
+
+    def test_historico_entra_para_o_catalogo_inteiro(self):
+        import gerar_site
+        import inspect
+        padrao = inspect.signature(gerar_site.exportar_historico).parameters["max_produtos"].default
+        self.assertGreaterEqual(padrao, 100000)
 
     def test_exportar_herda_historico_do_site_publicado(self):
         """O Actions roda sem banco: o publicado é o arquivo de longo prazo."""

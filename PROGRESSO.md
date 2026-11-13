@@ -41,6 +41,18 @@ Testes: 62, todos passando. Backup em `backups/antes-correcao-2026-11-12-0509/`.
 
 Backup em `backups/antes-design-2026-11-12-2207/`.
 
+## Histórico de todos os produtos, 13/11/2026 (Claude)
+
+O `historico.json` cobria 6.000 dos 42 mil produtos, então o gráfico quase nunca aparecia. Agora cobre todos:
+
+- A série guarda só as mudanças: o primeiro e o último dia de cada preço seguido, com o dia em dias desde 1970
+  (`_comprimir_serie` / `_expandir_serie` em `gerar_site.py`, `expandirSerie` em `static/index.html`).
+- O formato antigo (segundos) continua sendo lido. Janela de 90 dias, a mesma do veredito da oferta.
+- O site carrega o histórico depois de abrir, sem atrasar a primeira tela.
+- Tamanho hoje: cerca de 3 MB. Projeção com 90 dias de dados: 8 a 10 MB antes da compactação do servidor.
+
+Backup em `backups/antes-historico-completo-2026-11-13/`.
+
 ## O que foi pedido
 
 O usuário listou 7 ideias para o Ofertas SP e pediu: fazer o que eu achasse melhor, incluir
