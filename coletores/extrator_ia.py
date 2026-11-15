@@ -164,7 +164,7 @@ def _extrair_gemini(url):
         req = urllib.request.Request(api, data=corpo, headers={"Content-Type": "application/json",
                                                                "x-goog-api-key": os.environ["GEMINI_API_KEY"]})
         try:
-            with urllib.request.urlopen(req, timeout=100) as r:
+            with urllib.request.urlopen(req, timeout=240) as r:   # página cheia (3M) passa de 100 s
                 d = json.loads(r.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
             msg = e.read().decode("utf-8", "replace")

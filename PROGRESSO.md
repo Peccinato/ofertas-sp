@@ -7,6 +7,13 @@ sessão) retomar este trabalho, leia isto primeiro e continue daqui.
 
 ---
 
+## Tempo de espera do Gemini, 15/11/2026 (Claude)
+
+As duas páginas do 3M deram "The read operation timed out" nas cinco coletas de 13 a 15/11 (o download
+leva menos de 1 s; quem demora é o Gemini, com página de mais de cem produtos). O tempo de espera da
+chamada em `_extrair_gemini` passou de 100 para 240 s. Se não bastar, o próximo passo é cortar a página
+em metades antes de mandar. Backup: `backups/2026-11-15-tempo-gemini/`.
+
 ## Segunda coleta no dia, 13/11/2026 (Claude)
 
 Pedido do dono. A IA (Gemini grátis) lê em média 16 páginas novas por dia e deixa uns 5 folhetos
