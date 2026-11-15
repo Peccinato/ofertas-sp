@@ -8,13 +8,18 @@ import base64
 import json
 import os
 import re
+import socket
 import time
+import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
 
 MODELO = os.environ.get("OFERTAS_MODELO", "claude-opus-5-5")
 GEMINI_MODELO = os.environ.get("GEMINI_MODELO", "")   # vazio: escolhe sozinho o "flash" mais novo disponível
+ESPERA_GEMINI = 100
+FAIXAS = 4
+SOBRA = 0.06                                          # fração da altura que cada faixa avança sobre a vizinha
 
 ESQUEMA = {
     "type": "object",
@@ -141,9 +146,8 @@ def _tipo_da_imagem(url, tipo):
     return "image/jpeg"
 
 
-def _extrair_gemini(url):
-    dados, tipo = _baixar(url)
-    tipo = _tipo_da_imagem(url, tipo)
+def _chamar_gemini(dados, tipo):
+    """Envia a mídia ao Gemini com fila de modelos, espera e novas tentativas."""
     corpo = json.dumps({
         "contents": [{"parts": [{"inline_data": {"mime_type": tipo, "data": base64.b64encode(dados).decode()}},
                                 {"text": PROMPT}]}],
@@ -164,7 +168,7 @@ def _extrair_gemini(url):
         req = urllib.request.Request(api, data=corpo, headers={"Content-Type": "application/json",
                                                                "x-goog-api-key": os.environ["GEMINI_API_KEY"]})
         try:
-            with urllib.request.urlopen(req, timeout=240) as r:   # página cheia (3M) passa de 100 s
+            with urllib.request.urlopen(req, timeout=ESPERA_GEMINI) as r:
                 d = json.loads(r.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
             msg = e.read().decode("utf-8", "replace")
@@ -183,6 +187,70 @@ def _extrair_gemini(url):
         raise RuntimeError(f"Gemini parou: {cand.get('finishReason')}")
     texto = "".join(p.get("text", "") for p in (cand.get("content") or {}).get("parts", []))
     return json.loads(texto)["produtos"]
+
+
+def _cortar_em_faixas(dados, n=FAIXAS, sobra=SOBRA):
+    """Corta a imagem em faixas horizontais PNG com sobreposição para não partir produtos."""
+    import fitz
+
+    pix = fitz.Pixmap(dados)
+    if pix.colorspace and pix.colorspace.n > 3:   # PNG não aceita CMYK
+        pix = fitz.Pixmap(fitz.csRGB, pix)
+    largura, altura = pix.width, pix.height
+    margem = sobra * altura
+    faixas = []
+    for i in range(n):
+        y0 = 0 if i == 0 else max(0, round(i * altura / n - margem))
+        y1 = altura if i == n - 1 else min(altura, round((i + 1) * altura / n + margem))
+        rect = fitz.IRect(0, y0, largura, y1)
+        faixa = fitz.Pixmap(pix.colorspace, rect, pix.alpha)
+        faixa.copy(pix, rect)
+        faixas.append(faixa.tobytes("png"))
+    return faixas
+
+
+def _normalizar_nome(nome):
+    """Normaliza o nome do produto para comparar repetições entre faixas."""
+    s = unicodedata.normalize("NFKD", nome or "").lower()
+    s = "".join(c for c in s if not unicodedata.combining(c))
+    return re.sub(r"[^a-z0-9]+", " ", s).strip()
+
+
+def _juntar_faixas(listas):
+    """Junta as listas das faixas mantendo a ordem e removendo repetidos da sobreposição."""
+    resultado, vistos = [], set()
+    for lista in listas:
+        for p in lista:
+            chave = (_normalizar_nome(p.get("nome", "")), p.get("preco"))
+            if chave not in vistos:
+                vistos.add(chave)
+                resultado.append(p)
+    return resultado
+
+
+def _e_timeout(exc):
+    """Verifica se a exceção representa estouro de tempo (HTTPError não é timeout)."""
+    if isinstance(exc, (TimeoutError, socket.timeout)):
+        return True
+    return (isinstance(exc, urllib.error.URLError)
+            and not isinstance(exc, urllib.error.HTTPError)
+            and isinstance(exc.reason, (TimeoutError, socket.timeout)))
+
+
+def _extrair_gemini(url):
+    dados, tipo = _baixar(url)
+    tipo = _tipo_da_imagem(url, tipo)
+    try:
+        return _chamar_gemini(dados, tipo)
+    except (TimeoutError, socket.timeout, urllib.error.URLError) as e:
+        if not _e_timeout(e) or tipo == "application/pdf":
+            raise
+        try:
+            faixas = _cortar_em_faixas(dados)
+        except ImportError:
+            raise e
+        print(f"  página cheia: lendo em {len(faixas)} faixas")
+        return _juntar_faixas([_chamar_gemini(faixa, "image/png") for faixa in faixas])
 
 
 def _extrair_claude(url_imagem):

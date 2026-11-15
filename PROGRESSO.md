@@ -7,6 +7,16 @@ sessão) retomar este trabalho, leia isto primeiro e continue daqui.
 
 ---
 
+## Página cheia lida em faixas, 15/11/2026 (código do Hydrogen, revisão do Claude)
+
+Com 240 s o Gemini continuou estourando o tempo nas duas páginas do 3M. Agora, quando a leitura da
+imagem inteira estoura o tempo, `_extrair_gemini` corta a imagem em 4 faixas horizontais com 6% de
+sobra (`_cortar_em_faixas`, PyMuPDF), lê cada uma (`_chamar_gemini`, que ficou com o laço antigo) e
+junta sem os repetidos da sobra (`_juntar_faixas`). PDF não é cortado; erro numa faixa deixa a página
+para a próxima coleta. A espera voltou para 100 s (`ESPERA_GEMINI`). Testes: `TestCorteEmFaixas`
+(84 no total; o do corte real só roda com o PyMuPDF instalado).
+Backup: `backups/2026-11-15-corte-em-faixas/`.
+
 ## Tempo de espera do Gemini, 15/11/2026 (Claude)
 
 As duas páginas do 3M deram "The read operation timed out" nas cinco coletas de 13 a 15/11 (o download

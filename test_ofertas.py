@@ -4,6 +4,7 @@ Roda sem rede e sem tocar nos bancos de verdade: cada teste usa um diretório te
     py -m unittest -v test_ofertas
     py test_ofertas.py
 """
+import importlib.util
 import json
 import os
 import shutil
@@ -528,6 +529,147 @@ class TestLeitorDeFolhetos(unittest.TestCase):
         self.assertEqual(t("https://x/TABLOIDE.PDF", "image/jpeg"), "application/pdf")
         self.assertEqual(t("https://x/sem-extensao", "image/png"), "image/png")
         self.assertEqual(t("https://x/sem-extensao", ""), "image/jpeg")
+
+
+class TestCorteEmFaixas(unittest.TestCase):
+    def test_juntar_faixas_tira_repetidos_da_sobra(self):
+        from coletores import extrator_ia
+
+        faixa1 = [
+            {"nome": "Café Pilão 500g", "preco": 19.9, "preco_de": 22.9, "condicao": ""},
+            {"nome": "Arroz Camil 5kg", "preco": 29.9, "preco_de": None, "condicao": ""},
+        ]
+        faixa2 = [
+            {"nome": "CAFE  PILAO - 500G!", "preco": 19.9, "preco_de": None, "condicao": "cada"},
+            {"nome": "Arroz Camil 5kg", "preco": 24.9, "preco_de": None, "condicao": "no cartão"},
+            {"nome": "Feijão Carioca 1kg", "preco": 7.49, "preco_de": None, "condicao": ""},
+        ]
+
+        junto = extrator_ia._juntar_faixas([faixa1, faixa2])
+        self.assertEqual(len(junto), 4)
+        self.assertEqual([p["nome"] for p in junto], ["Café Pilão 500g", "Arroz Camil 5kg", "Arroz Camil 5kg", "Feijão Carioca 1kg"])
+        self.assertEqual(junto[0]["preco_de"], 22.9)
+
+    def test_pagina_cheia_e_lida_em_faixas(self):
+        from coletores import extrator_ia
+
+        orig_baixar = extrator_ia._baixar
+        orig_chamar = extrator_ia._chamar_gemini
+        orig_cortar = extrator_ia._cortar_em_faixas
+        chamadas = []
+
+        def falso_baixar(url):
+            return b"imagem-inteira", "image/jpeg"
+
+        def falso_cortar(dados):
+            return [f"faixa-{i}".encode() for i in range(extrator_ia.FAIXAS)]
+
+        def falso_chamar(dados, tipo):
+            chamadas.append((dados, tipo))
+            if len(chamadas) == 1:
+                raise TimeoutError("The read operation timed out")
+            idx = len(chamadas) - 2
+            if idx == 0:
+                return [{"nome": "Leite Integral 1L", "preco": 4.99, "preco_de": None, "condicao": ""}]
+            if idx == 1:
+                return [
+                    {"nome": "LEITE  INTEGRAL 1L", "preco": 4.99, "preco_de": None, "condicao": ""},
+                    {"nome": "Açúcar União 1kg", "preco": 5.49, "preco_de": None, "condicao": ""},
+                ]
+            return [{"nome": f"Item {idx}", "preco": float(idx + 10), "preco_de": None, "condicao": ""}]
+
+        try:
+            extrator_ia._baixar = falso_baixar
+            extrator_ia._chamar_gemini = falso_chamar
+            extrator_ia._cortar_em_faixas = falso_cortar
+            resultado = extrator_ia._extrair_gemini("https://exemplo.com/folheto.jpg")
+        finally:
+            extrator_ia._baixar = orig_baixar
+            extrator_ia._chamar_gemini = orig_chamar
+            extrator_ia._cortar_em_faixas = orig_cortar
+
+        self.assertEqual(len(chamadas), 1 + extrator_ia.FAIXAS)
+        self.assertEqual(chamadas[0], (b"imagem-inteira", "image/jpeg"))
+        self.assertTrue(all(tipo == "image/png" for _, tipo in chamadas[1:]))
+        self.assertEqual([p["nome"] for p in resultado], ["Leite Integral 1L", "Açúcar União 1kg", "Item 2", "Item 3"])
+
+    def test_pdf_que_estoura_o_tempo_nao_e_cortado(self):
+        from coletores import extrator_ia
+
+        orig_baixar = extrator_ia._baixar
+        orig_chamar = extrator_ia._chamar_gemini
+        orig_cortar = extrator_ia._cortar_em_faixas
+        cortou = []
+
+        def falso_baixar(url):
+            return b"%PDF-1.4", "application/pdf"
+
+        def falso_chamar(dados, tipo):
+            raise TimeoutError("The read operation timed out")
+
+        def falso_cortar(dados):
+            cortou.append(dados)
+            return []
+
+        try:
+            extrator_ia._baixar = falso_baixar
+            extrator_ia._chamar_gemini = falso_chamar
+            extrator_ia._cortar_em_faixas = falso_cortar
+            with self.assertRaises(TimeoutError):
+                extrator_ia._extrair_gemini("https://exemplo.com/folheto.pdf")
+        finally:
+            extrator_ia._baixar = orig_baixar
+            extrator_ia._chamar_gemini = orig_chamar
+            extrator_ia._cortar_em_faixas = orig_cortar
+
+        self.assertEqual(cortou, [])
+
+    def test_erro_http_nao_vira_corte(self):
+        import urllib.error
+        from coletores import extrator_ia
+
+        orig_baixar = extrator_ia._baixar
+        orig_chamar = extrator_ia._chamar_gemini
+        orig_cortar = extrator_ia._cortar_em_faixas
+        cortou = []
+
+        def falso_baixar(url):
+            return b"imagem-inteira", "image/jpeg"
+
+        def falso_chamar(dados, tipo):
+            raise urllib.error.HTTPError("https://generativelanguage.googleapis.com", 500, "Internal Server Error", {}, None)
+
+        def falso_cortar(dados):
+            cortou.append(dados)
+            return []
+
+        try:
+            extrator_ia._baixar = falso_baixar
+            extrator_ia._chamar_gemini = falso_chamar
+            extrator_ia._cortar_em_faixas = falso_cortar
+            with self.assertRaises(urllib.error.HTTPError) as ctx:
+                extrator_ia._extrair_gemini("https://exemplo.com/folheto.jpg")
+        finally:
+            extrator_ia._baixar = orig_baixar
+            extrator_ia._chamar_gemini = orig_chamar
+            extrator_ia._cortar_em_faixas = orig_cortar
+
+        self.assertEqual(ctx.exception.code, 500)
+        self.assertEqual(cortou, [])
+
+    @unittest.skipUnless(importlib.util.find_spec("fitz"), "PyMuPDF não instalado")
+    def test_cortar_em_faixas_cobre_a_imagem(self):
+        import fitz
+        from coletores import extrator_ia
+
+        pix = fitz.Pixmap(fitz.csRGB, fitz.IRect(0, 0, 90, 400), False)
+        pix.clear_with(255)
+        dados = pix.tobytes("png")
+
+        faixas = extrator_ia._cortar_em_faixas(dados, n=4)
+        self.assertEqual(len(faixas), 4)
+        dimensoes = [(p.width, p.height) for p in (fitz.Pixmap(f) for f in faixas)]
+        self.assertEqual(dimensoes, [(90, 124), (90, 148), (90, 148), (90, 124)])
 
 
 class TestColetores(unittest.TestCase):
