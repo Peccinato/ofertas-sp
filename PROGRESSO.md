@@ -13,7 +13,9 @@ Com 240 s o Gemini continuou estourando o tempo nas duas páginas do 3M. Agora, 
 imagem inteira estoura o tempo, `_extrair_gemini` corta a imagem em 4 faixas horizontais com 6% de
 sobra (`_cortar_em_faixas`, PyMuPDF), lê cada uma (`_chamar_gemini`, que ficou com o laço antigo) e
 junta sem os repetidos da sobra (`_juntar_faixas`). PDF não é cortado; erro numa faixa deixa a página
-para a próxima coleta. A espera voltou para 100 s (`ESPERA_GEMINI`). Testes: `TestCorteEmFaixas`
+para a próxima coleta. A espera voltou para 100 s (`ESPERA_GEMINI`). Medido no PC: o modelo principal grátis leva
+uns 200 s por faixa e acerta 29 de 29 preços; o flash-lite leva 5 s, erra 1 em 29 e põe o preço do
+cartão como principal. Por escolha do dono, as faixas esperam 300 s (`ESPERA_FAIXA`) no modelo principal. Testes: `TestCorteEmFaixas`
 (84 no total; o do corte real só roda com o PyMuPDF instalado).
 Backup: `backups/2026-11-15-corte-em-faixas/`.
 

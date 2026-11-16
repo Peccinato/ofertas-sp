@@ -564,8 +564,8 @@ class TestCorteEmFaixas(unittest.TestCase):
         def falso_cortar(dados):
             return [f"faixa-{i}".encode() for i in range(extrator_ia.FAIXAS)]
 
-        def falso_chamar(dados, tipo):
-            chamadas.append((dados, tipo))
+        def falso_chamar(dados, tipo, espera=None):
+            chamadas.append((dados, tipo, espera))
             if len(chamadas) == 1:
                 raise TimeoutError("The read operation timed out")
             idx = len(chamadas) - 2
@@ -589,8 +589,8 @@ class TestCorteEmFaixas(unittest.TestCase):
             extrator_ia._cortar_em_faixas = orig_cortar
 
         self.assertEqual(len(chamadas), 1 + extrator_ia.FAIXAS)
-        self.assertEqual(chamadas[0], (b"imagem-inteira", "image/jpeg"))
-        self.assertTrue(all(tipo == "image/png" for _, tipo in chamadas[1:]))
+        self.assertEqual(chamadas[0], (b"imagem-inteira", "image/jpeg", None))
+        self.assertTrue(all(tipo == "image/png" and espera == extrator_ia.ESPERA_FAIXA for _, tipo, espera in chamadas[1:]))
         self.assertEqual([p["nome"] for p in resultado], ["Leite Integral 1L", "Açúcar União 1kg", "Item 2", "Item 3"])
 
     def test_pdf_que_estoura_o_tempo_nao_e_cortado(self):
@@ -604,7 +604,7 @@ class TestCorteEmFaixas(unittest.TestCase):
         def falso_baixar(url):
             return b"%PDF-1.4", "application/pdf"
 
-        def falso_chamar(dados, tipo):
+        def falso_chamar(dados, tipo, espera=None):
             raise TimeoutError("The read operation timed out")
 
         def falso_cortar(dados):
@@ -636,7 +636,7 @@ class TestCorteEmFaixas(unittest.TestCase):
         def falso_baixar(url):
             return b"imagem-inteira", "image/jpeg"
 
-        def falso_chamar(dados, tipo):
+        def falso_chamar(dados, tipo, espera=None):
             raise urllib.error.HTTPError("https://generativelanguage.googleapis.com", 500, "Internal Server Error", {}, None)
 
         def falso_cortar(dados):

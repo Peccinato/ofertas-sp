@@ -18,6 +18,7 @@ import urllib.request
 MODELO = os.environ.get("OFERTAS_MODELO", "claude-opus-5-5")
 GEMINI_MODELO = os.environ.get("GEMINI_MODELO", "")   # vazio: escolhe sozinho o "flash" mais novo disponível
 ESPERA_GEMINI = 100
+ESPERA_FAIXA = 300                                    # o modelo principal grátis leva uns 200 s por faixa
 FAIXAS = 4
 SOBRA = 0.06                                          # fração da altura que cada faixa avança sobre a vizinha
 
@@ -146,7 +147,7 @@ def _tipo_da_imagem(url, tipo):
     return "image/jpeg"
 
 
-def _chamar_gemini(dados, tipo):
+def _chamar_gemini(dados, tipo, espera=ESPERA_GEMINI):
     """Envia a mídia ao Gemini com fila de modelos, espera e novas tentativas."""
     corpo = json.dumps({
         "contents": [{"parts": [{"inline_data": {"mime_type": tipo, "data": base64.b64encode(dados).decode()}},
@@ -160,15 +161,15 @@ def _chamar_gemini(dados, tipo):
             raise CotaEsgotada("cota grátis do Gemini esgotada hoje")
         modelo = fila[0]
         # o plano grátis também limita as chamadas por minuto: espaça as chamadas
-        espera = 7 - (time.time() - _ultima_chamada[0])
-        if espera > 0:
-            time.sleep(espera)
+        pausa = 7 - (time.time() - _ultima_chamada[0])
+        if pausa > 0:
+            time.sleep(pausa)
         _ultima_chamada[0] = time.time()
         api = f"https://generativelanguage.googleapis.com/v1beta/models/{modelo}:generateContent"
         req = urllib.request.Request(api, data=corpo, headers={"Content-Type": "application/json",
                                                                "x-goog-api-key": os.environ["GEMINI_API_KEY"]})
         try:
-            with urllib.request.urlopen(req, timeout=ESPERA_GEMINI) as r:
+            with urllib.request.urlopen(req, timeout=espera) as r:
                 d = json.loads(r.read().decode("utf-8"))
         except urllib.error.HTTPError as e:
             msg = e.read().decode("utf-8", "replace")
@@ -250,7 +251,7 @@ def _extrair_gemini(url):
         except ImportError:
             raise e
         print(f"  página cheia: lendo em {len(faixas)} faixas")
-        return _juntar_faixas([_chamar_gemini(faixa, "image/png") for faixa in faixas])
+        return _juntar_faixas([_chamar_gemini(faixa, "image/png", ESPERA_FAIXA) for faixa in faixas])
 
 
 def _extrair_claude(url_imagem):
