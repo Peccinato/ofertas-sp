@@ -564,8 +564,8 @@ class TestCorteEmFaixas(unittest.TestCase):
         def falso_cortar(dados):
             return [f"faixa-{i}".encode() for i in range(extrator_ia.FAIXAS)]
 
-        def falso_chamar(dados, tipo, espera=None):
-            chamadas.append((dados, tipo, espera))
+        def falso_chamar(dados, tipo, espera=None, so_principal=False):
+            chamadas.append((dados, tipo, espera, so_principal))
             if len(chamadas) == 1:
                 raise TimeoutError("The read operation timed out")
             idx = len(chamadas) - 2
@@ -589,9 +589,57 @@ class TestCorteEmFaixas(unittest.TestCase):
             extrator_ia._cortar_em_faixas = orig_cortar
 
         self.assertEqual(len(chamadas), 1 + extrator_ia.FAIXAS)
-        self.assertEqual(chamadas[0], (b"imagem-inteira", "image/jpeg", None))
-        self.assertTrue(all(tipo == "image/png" and espera == extrator_ia.ESPERA_FAIXA for _, tipo, espera in chamadas[1:]))
+        self.assertEqual(chamadas[0], (b"imagem-inteira", "image/jpeg", None, False))
+        self.assertTrue(all(tipo == "image/png" and espera == extrator_ia.ESPERA_FAIXA and so_principal is True
+                            for _, tipo, espera, so_principal in chamadas[1:]))
         self.assertEqual([p["nome"] for p in resultado], ["Leite Integral 1L", "Açúcar União 1kg", "Item 2", "Item 3"])
+
+    def test_pagina_do_3m_so_no_modelo_principal(self):
+        from coletores import extrator_ia
+
+        orig_baixar = extrator_ia._baixar
+        orig_chamar = extrator_ia._chamar_gemini
+        chamadas = []
+
+        def falso_baixar(url):
+            return b"imagem-3m", "image/jpeg"
+
+        def falso_chamar(dados, tipo, espera=None, so_principal=False):
+            chamadas.append((dados, tipo, espera, so_principal))
+            return [{"nome": "Arroz 5kg", "preco": 25.0, "preco_de": None, "condicao": ""}]
+
+        try:
+            extrator_ia._baixar = falso_baixar
+            extrator_ia._chamar_gemini = falso_chamar
+            resultado = extrator_ia._extrair_gemini("https://static.wixstatic.com/media/14df23_abc~mv2.jpeg")
+        finally:
+            extrator_ia._baixar = orig_baixar
+            extrator_ia._chamar_gemini = orig_chamar
+
+        self.assertEqual(chamadas, [(b"imagem-3m", "image/jpeg", None, True)])
+        self.assertEqual(len(resultado), 1)
+
+    def test_principal_esgotado_nao_usa_o_modelo_menor(self):
+        from coletores import extrator_ia
+
+        orig_fila = extrator_ia._fila[:]
+        orig_principal = extrator_ia._principal[:]
+        orig_urlopen = extrator_ia.urllib.request.urlopen
+
+        def falso_urlopen(*args, **kwargs):
+            self.fail("não deveria chamar a API quando a cota do modelo principal acabou")
+
+        try:
+            extrator_ia._fila[:] = ["gemini-x-flash-lite"]
+            extrator_ia._principal[:] = ["gemini-x-flash"]
+            extrator_ia.urllib.request.urlopen = falso_urlopen
+            self.assertFalse(issubclass(extrator_ia.PrincipalEsgotado, extrator_ia.CotaEsgotada))
+            with self.assertRaises(extrator_ia.PrincipalEsgotado):
+                extrator_ia._chamar_gemini(b"x", "image/png", so_principal=True)
+        finally:
+            extrator_ia._fila[:] = orig_fila
+            extrator_ia._principal[:] = orig_principal
+            extrator_ia.urllib.request.urlopen = orig_urlopen
 
     def test_pdf_que_estoura_o_tempo_nao_e_cortado(self):
         from coletores import extrator_ia
@@ -604,7 +652,7 @@ class TestCorteEmFaixas(unittest.TestCase):
         def falso_baixar(url):
             return b"%PDF-1.4", "application/pdf"
 
-        def falso_chamar(dados, tipo, espera=None):
+        def falso_chamar(dados, tipo, espera=None, so_principal=False):
             raise TimeoutError("The read operation timed out")
 
         def falso_cortar(dados):
@@ -636,7 +684,7 @@ class TestCorteEmFaixas(unittest.TestCase):
         def falso_baixar(url):
             return b"imagem-inteira", "image/jpeg"
 
-        def falso_chamar(dados, tipo, espera=None):
+        def falso_chamar(dados, tipo, espera=None, so_principal=False):
             raise urllib.error.HTTPError("https://generativelanguage.googleapis.com", 500, "Internal Server Error", {}, None)
 
         def falso_cortar(dados):
@@ -670,6 +718,17 @@ class TestCorteEmFaixas(unittest.TestCase):
         self.assertEqual(len(faixas), 4)
         dimensoes = [(p.width, p.height) for p in (fitz.Pixmap(f) for f in faixas)]
         self.assertEqual(dimensoes, [(90, 124), (90, 148), (90, 148), (90, 124)])
+
+
+class TestReler(unittest.TestCase):
+    def test_deve_reler(self):
+        import gerar_site
+
+        url_3m = "https://static.wixstatic.com/media/14df23_abc~mv2.jpeg"
+        self.assertTrue(gerar_site._deve_reler(url_3m, ["14df23_"]))
+        self.assertFalse(gerar_site._deve_reler("https://exemplo.com/folheto.jpg", ["14df23_"]))
+        self.assertFalse(gerar_site._deve_reler(url_3m, []))
+        self.assertFalse(gerar_site._deve_reler(url_3m, [""]))
 
 
 class TestColetores(unittest.TestCase):

@@ -21,6 +21,7 @@ ESPERA_GEMINI = 100
 ESPERA_FAIXA = 300                                    # o modelo principal grátis leva uns 200 s por faixa
 FAIXAS = 4
 SOBRA = 0.06                                          # fração da altura que cada faixa avança sobre a vizinha
+PAGINAS_CHEIAS = ("static.wixstatic.com/media/14df23_",)   # trechos de endereço de folhetos cheios demais para o modelo menor (3M)
 
 ESQUEMA = {
     "type": "object",
@@ -89,14 +90,22 @@ class CotaEsgotada(RuntimeError):
     """A cota grátis do dia acabou em todos os modelos: o resto fica para a próxima execução."""
 
 
-_fila = []   # modelos a usar, em ordem; os que esgotam a cota do dia são removidos
+class PrincipalEsgotado(RuntimeError):
+    """A cota do modelo principal acabou e esta página não pode ser lida pelo menor; fica para a próxima coleta."""
+
+
+_fila = []        # modelos a usar, em ordem; os que esgotam a cota do dia são removidos
+_principal = []   # modelo principal (primeiro da fila)
 
 
 def _modelos_gemini():
     """O Google aposenta modelos com frequência: pergunta à API quais existem.
     Usa o 'flash' estável mais novo e, quando a cota dele acaba, o 'flash-lite' (cota grátis maior)."""
     if _fila or GEMINI_MODELO:
-        return _fila or [GEMINI_MODELO]
+        fila = _fila or [GEMINI_MODELO]
+        if not _principal:
+            _principal.append(fila[0])
+        return fila
     nomes, pagina = [], ""
     while True:
         url = "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200" + (f"&pageToken={pagina}" if pagina else "")
@@ -114,6 +123,8 @@ def _modelos_gemini():
             _fila.append(max(vs)[1])
     if not _fila:
         raise RuntimeError(f"nenhum modelo Gemini flash disponível ({', '.join(nomes[:8])}...)")
+    if not _principal:
+        _principal.append(_fila[0])
     print("  Gemini: modelos", " -> ".join(_fila))
     return _fila
 
@@ -147,7 +158,7 @@ def _tipo_da_imagem(url, tipo):
     return "image/jpeg"
 
 
-def _chamar_gemini(dados, tipo, espera=ESPERA_GEMINI):
+def _chamar_gemini(dados, tipo, espera=ESPERA_GEMINI, so_principal=False):
     """Envia a mídia ao Gemini com fila de modelos, espera e novas tentativas."""
     corpo = json.dumps({
         "contents": [{"parts": [{"inline_data": {"mime_type": tipo, "data": base64.b64encode(dados).decode()}},
@@ -159,6 +170,8 @@ def _chamar_gemini(dados, tipo, espera=ESPERA_GEMINI):
         fila = _modelos_gemini()
         if not fila:
             raise CotaEsgotada("cota grátis do Gemini esgotada hoje")
+        if so_principal and fila[0] != _principal[0]:
+            raise PrincipalEsgotado("cota do modelo principal esgotada; a página fica para a próxima coleta")
         modelo = fila[0]
         # o plano grátis também limita as chamadas por minuto: espaça as chamadas
         pausa = 7 - (time.time() - _ultima_chamada[0])
@@ -241,8 +254,9 @@ def _e_timeout(exc):
 def _extrair_gemini(url):
     dados, tipo = _baixar(url)
     tipo = _tipo_da_imagem(url, tipo)
+    cheia = any(t in url for t in PAGINAS_CHEIAS)
     try:
-        return _chamar_gemini(dados, tipo)
+        return _chamar_gemini(dados, tipo, so_principal=cheia)
     except (TimeoutError, socket.timeout, urllib.error.URLError) as e:
         if not _e_timeout(e) or tipo == "application/pdf":
             raise
@@ -251,7 +265,7 @@ def _extrair_gemini(url):
         except ImportError:
             raise e
         print(f"  página cheia: lendo em {len(faixas)} faixas")
-        return _juntar_faixas([_chamar_gemini(faixa, "image/png", ESPERA_FAIXA) for faixa in faixas])
+        return _juntar_faixas([_chamar_gemini(faixa, "image/png", ESPERA_FAIXA, so_principal=True) for faixa in faixas])
 
 
 def _extrair_claude(url_imagem):

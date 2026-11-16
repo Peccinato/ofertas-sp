@@ -10,6 +10,7 @@ Variáveis de ambiente (opcionais):
     OFERTAS_TERMOS     limita a cesta aos N primeiros termos (para testes rápidos)
     OFERTAS_PROXY      endereço do proxy (Cloudflare Worker) que permite busca ao vivo com qualquer CEP
     OFERTAS_SAIDA      pasta de saída (padrão: site/)
+    OFERTAS_RELER      trechos de endereço (separados por vírgula) de folhetos para reler com IA mesmo no cache
 """
 import hashlib
 import json
@@ -50,6 +51,11 @@ CESTA_EXTRA = [
     "absorvente", "lenço umedecido", "escova de dente", "fio dental", "aparelho de barbear",
     "ração para cachorro", "ração para gato", "areia para gato", "pilha", "carvão",
 ]
+
+
+def _deve_reler(img, padroes):
+    """True se algum padrão (texto não vazio) aparece em img."""
+    return any(p in img for p in padroes if p)
 
 
 def baixar_json(url):
@@ -105,16 +111,19 @@ def main():
     # leitura dos folhetos com IA, reaproveitando o que a execução anterior já leu
     cache_url = (os.environ.get("SITE_URL") or "").rstrip("/") + "/dados/folhetos-lidos.json"
     cache = (baixar_json(cache_url) if os.environ.get("SITE_URL") else None) or {}
+    reler = [p.strip() for p in (os.environ.get("OFERTAS_RELER") or "").split(",") if p.strip()]
     lidos = {}
     ia_ok = extrator_ia.disponivel()[0]
     novos = 0
     # a leitura com IA é a parte lenta e incerta da coleta: passado este tempo (contado do início),
     # o que falta fica para a próxima execução, em vez de estourar o limite do Actions e não publicar nada
     limite_ia = inicio + 60 * float(os.environ.get("OFERTAS_MINUTOS_IA") or 40)
+    if reler:
+        print("  Relendo com IA (ignora a leitura guardada):", ", ".join(reler))
     for f in intercalar_por_mercado(db.listar_folhetos()):
         img = f["imagem"]
         try:
-            if img in cache:
+            if img in cache and not _deve_reler(img, reler):
                 app.ler_folheto(img, itens=cache[img])
             elif ia_ok and time.time() > limite_ia:
                 print("  Tempo da leitura com IA esgotado; os folhetos restantes ficam para a próxima coleta.")

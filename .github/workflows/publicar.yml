@@ -5,6 +5,11 @@ on:
     - cron: "0 9 * * *"   # todo dia às 06:00 de São Paulo
     - cron: "0 18 * * *"  # e às 15:00: tenta de novo os folhetos que a IA não leu de manhã
   workflow_dispatch:       # botão "Run workflow" para atualizar na hora
+    inputs:
+      reler:
+        description: "Reler com IA os folhetos cujo endereço contém estes trechos (separados por vírgula)"
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -31,6 +36,7 @@ jobs:
           PYTHONUNBUFFERED: "1"   # o andamento aparece no registro na hora, não só no fim
           OFERTAS_CEP: ${{ vars.OFERTAS_CEP }}
           OFERTAS_PROXY: ${{ vars.OFERTAS_PROXY }}
+          OFERTAS_RELER: ${{ inputs.reler }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           SITE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}

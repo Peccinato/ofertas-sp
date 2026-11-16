@@ -7,6 +7,20 @@ sessão) retomar este trabalho, leia isto primeiro e continue daqui.
 
 ---
 
+## Página cheia só no modelo principal e botão de reler, 16/11/2026 (código do Hydrogen, revisão do Claude)
+
+A página 2 do 3M foi lida em faixas pelo modelo principal (79 produtos, 10 conferidos, todos certos).
+A página 1 caiu no flash-lite porque a cota do principal tinha acabado: 61 produtos com preços
+inventados (itens "Oferta especial" sem preço), errados e com o preço do cartão como principal.
+- `PAGINAS_CHEIAS` (extrator_ia.py): endereços que só o modelo principal lê (3M). As faixas também são
+  sempre do principal. Sem cota, levanta `PrincipalEsgotado` e a página fica para a próxima coleta
+  (as outras páginas seguem para o modelo menor, como antes).
+- `OFERTAS_RELER` (gerar_site.py) e campo "reler" no botão do `publicar.yml`: ignora a leitura guardada
+  dos folhetos cujo endereço contém os trechos dados. Se a releitura falhar, a página fica sem leitura.
+  Uso: `gh workflow run "Publicar site" -R peccinato/ofertas-sp -f reler=14df23_0e50`.
+- Pendente de decisão do dono: a queda para o flash-lite continua valendo para os outros mercados.
+Backup: `backups/2026-11-16-so-principal-reler/`. 87 testes.
+
 ## Página cheia lida em faixas, 15/11/2026 (código do Hydrogen, revisão do Claude)
 
 Com 240 s o Gemini continuou estourando o tempo nas duas páginas do 3M. Agora, quando a leitura da
