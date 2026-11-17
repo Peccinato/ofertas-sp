@@ -7,6 +7,19 @@ sessão) retomar este trabalho, leia isto primeiro e continue daqui.
 
 ---
 
+## Cota do Gemini sem desperdício, 17/11/2026 (código do Hydrogen, revisão do Claude)
+
+O modelo principal grátis aceita uns 20 pedidos por dia. Em 16/11, quatro folhetos com 503 gastaram
+uns 16 pedidos em novas tentativas, e a cota acabou depois de 8 páginas.
+- `_chamar_gemini`: 500 e 503 não são mais tentados de novo; a página fica para a próxima coleta.
+  Só o 429 por minuto continua com até 3 tentativas (pausa de 60 s).
+- `_extrair_gemini`: páginas de `PAGINAS_CHEIAS` (3M) vão direto às 4 faixas, sem tentar a página inteira
+  (sem PyMuPDF, lê inteira só no principal).
+- Não feito, de propósito: se uma faixa falha, a página inteira fica para depois (não guarda meia página).
+- Achados do review: agendamentos do GitHub saem 4 a 8 h atrasados e às vezes nem rodam (16/11 06:00).
+  A seção "O que ainda NÃO foi feito" no fim deste arquivo está desatualizada (o site já é publicado).
+Backup: `backups/2026-11-16-cota-gemini/`. 90 testes.
+
 ## Página cheia só no modelo principal e botão de reler, 16/11/2026 (código do Hydrogen, revisão do Claude)
 
 A página 2 do 3M foi lida em faixas pelo modelo principal (79 produtos, 10 conferidos, todos certos).

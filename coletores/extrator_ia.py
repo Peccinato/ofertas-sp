@@ -192,8 +192,8 @@ def _chamar_gemini(dados, tipo, espera=ESPERA_GEMINI, so_principal=False):
                 fila.pop(0)                      # passa para o próximo modelo (ou para de vez)
                 if not fila:
                     raise CotaEsgotada("cota grátis do Gemini esgotada hoje")
-            elif e.code in (429, 500, 503) and tentativa <= 3:
-                time.sleep(60 if e.code == 429 else 20 * tentativa)   # limite por minuto ou instabilidade
+            elif e.code == 429 and tentativa <= 3:
+                time.sleep(60)                   # limite por minuto
             else:
                 raise RuntimeError(f"Gemini HTTP {e.code} ({modelo}): {msg[:200]}")
     cand = (d.get("candidates") or [{}])[0]
@@ -255,17 +255,24 @@ def _extrair_gemini(url):
     dados, tipo = _baixar(url)
     tipo = _tipo_da_imagem(url, tipo)
     cheia = any(t in url for t in PAGINAS_CHEIAS)
-    try:
-        return _chamar_gemini(dados, tipo, so_principal=cheia)
-    except (TimeoutError, socket.timeout, urllib.error.URLError) as e:
-        if not _e_timeout(e) or tipo == "application/pdf":
-            raise
+    faixas = None
+    if cheia and tipo != "application/pdf":
         try:
             faixas = _cortar_em_faixas(dados)
         except ImportError:
-            raise e
-        print(f"  página cheia: lendo em {len(faixas)} faixas")
-        return _juntar_faixas([_chamar_gemini(faixa, "image/png", ESPERA_FAIXA, so_principal=True) for faixa in faixas])
+            pass
+    if faixas is None:
+        try:
+            return _chamar_gemini(dados, tipo, so_principal=cheia)
+        except (TimeoutError, socket.timeout, urllib.error.URLError) as e:
+            if not _e_timeout(e) or tipo == "application/pdf":
+                raise
+            try:
+                faixas = _cortar_em_faixas(dados)
+            except ImportError:
+                raise e
+    print(f"  página cheia: lendo em {len(faixas)} faixas")
+    return _juntar_faixas([_chamar_gemini(faixa, "image/png", ESPERA_FAIXA, so_principal=True) for faixa in faixas])
 
 
 def _extrair_claude(url_imagem):

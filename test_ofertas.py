@@ -594,15 +594,53 @@ class TestCorteEmFaixas(unittest.TestCase):
                             for _, tipo, espera, so_principal in chamadas[1:]))
         self.assertEqual([p["nome"] for p in resultado], ["Leite Integral 1L", "Açúcar União 1kg", "Item 2", "Item 3"])
 
-    def test_pagina_do_3m_so_no_modelo_principal(self):
+    def test_pagina_do_3m_vai_direto_as_faixas(self):
         from coletores import extrator_ia
 
         orig_baixar = extrator_ia._baixar
         orig_chamar = extrator_ia._chamar_gemini
+        orig_cortar = extrator_ia._cortar_em_faixas
         chamadas = []
 
         def falso_baixar(url):
             return b"imagem-3m", "image/jpeg"
+
+        def falso_cortar(dados):
+            return [f"faixa-{i}".encode() for i in range(extrator_ia.FAIXAS)]
+
+        def falso_chamar(dados, tipo, espera=None, so_principal=False):
+            chamadas.append((dados, tipo, espera, so_principal))
+            return [{"nome": f"Item {len(chamadas)}", "preco": float(len(chamadas)), "preco_de": None, "condicao": ""}]
+
+        try:
+            extrator_ia._baixar = falso_baixar
+            extrator_ia._chamar_gemini = falso_chamar
+            extrator_ia._cortar_em_faixas = falso_cortar
+            resultado = extrator_ia._extrair_gemini("https://static.wixstatic.com/media/14df23_abc~mv2.jpeg")
+        finally:
+            extrator_ia._baixar = orig_baixar
+            extrator_ia._chamar_gemini = orig_chamar
+            extrator_ia._cortar_em_faixas = orig_cortar
+
+        self.assertEqual(len(chamadas), extrator_ia.FAIXAS)
+        self.assertTrue(all(dados != b"imagem-3m" and tipo == "image/png"
+                            and espera == extrator_ia.ESPERA_FAIXA and so_principal is True
+                            for dados, tipo, espera, so_principal in chamadas))
+        self.assertEqual(len(resultado), extrator_ia.FAIXAS)
+
+    def test_pagina_do_3m_sem_fitz_le_inteira_so_no_principal(self):
+        from coletores import extrator_ia
+
+        orig_baixar = extrator_ia._baixar
+        orig_chamar = extrator_ia._chamar_gemini
+        orig_cortar = extrator_ia._cortar_em_faixas
+        chamadas = []
+
+        def falso_baixar(url):
+            return b"imagem-3m", "image/jpeg"
+
+        def falso_cortar(dados):
+            raise ImportError("No module named 'fitz'")
 
         def falso_chamar(dados, tipo, espera=None, so_principal=False):
             chamadas.append((dados, tipo, espera, so_principal))
@@ -611,10 +649,12 @@ class TestCorteEmFaixas(unittest.TestCase):
         try:
             extrator_ia._baixar = falso_baixar
             extrator_ia._chamar_gemini = falso_chamar
+            extrator_ia._cortar_em_faixas = falso_cortar
             resultado = extrator_ia._extrair_gemini("https://static.wixstatic.com/media/14df23_abc~mv2.jpeg")
         finally:
             extrator_ia._baixar = orig_baixar
             extrator_ia._chamar_gemini = orig_chamar
+            extrator_ia._cortar_em_faixas = orig_cortar
 
         self.assertEqual(chamadas, [(b"imagem-3m", "image/jpeg", None, True)])
         self.assertEqual(len(resultado), 1)
@@ -640,6 +680,114 @@ class TestCorteEmFaixas(unittest.TestCase):
             extrator_ia._fila[:] = orig_fila
             extrator_ia._principal[:] = orig_principal
             extrator_ia.urllib.request.urlopen = orig_urlopen
+
+    def test_erro_503_nao_tenta_de_novo(self):
+        import io
+        import os
+        import urllib.error
+        from coletores import extrator_ia
+
+        orig_fila = extrator_ia._fila[:]
+        orig_principal = extrator_ia._principal[:]
+        orig_ultima = extrator_ia._ultima_chamada[0]
+        orig_chave = os.environ.get("GEMINI_API_KEY")
+        orig_urlopen = extrator_ia.urllib.request.urlopen
+        orig_sleep = extrator_ia.time.sleep
+        chamadas = []
+        pausas = []
+
+        def falso_urlopen(req, timeout=None):
+            chamadas.append(req)
+            raise urllib.error.HTTPError(req.full_url, 503, "Service Unavailable", {}, io.BytesIO(b"modelo ocupado"))
+
+        def falso_sleep(segundos):
+            pausas.append(segundos)
+
+        try:
+            extrator_ia._fila[:] = ["gemini-x-flash"]
+            extrator_ia._principal[:] = ["gemini-x-flash"]
+            extrator_ia._ultima_chamada[0] = 0.0
+            os.environ["GEMINI_API_KEY"] = "chave-teste"
+            extrator_ia.urllib.request.urlopen = falso_urlopen
+            extrator_ia.time.sleep = falso_sleep
+            with self.assertRaises(RuntimeError) as ctx:
+                extrator_ia._chamar_gemini(b"x", "image/png")
+        finally:
+            extrator_ia._fila[:] = orig_fila
+            extrator_ia._principal[:] = orig_principal
+            extrator_ia._ultima_chamada[0] = orig_ultima
+            if orig_chave is None:
+                os.environ.pop("GEMINI_API_KEY", None)
+            else:
+                os.environ["GEMINI_API_KEY"] = orig_chave
+            extrator_ia.urllib.request.urlopen = orig_urlopen
+            extrator_ia.time.sleep = orig_sleep
+
+        self.assertEqual(len(chamadas), 1)
+        self.assertEqual(pausas, [])
+        self.assertIn("Gemini HTTP 503 (gemini-x-flash)", str(ctx.exception))
+
+    def test_429_por_minuto_tenta_de_novo(self):
+        import io
+        import json
+        import os
+        import urllib.error
+        from coletores import extrator_ia
+
+        orig_fila = extrator_ia._fila[:]
+        orig_principal = extrator_ia._principal[:]
+        orig_ultima = extrator_ia._ultima_chamada[0]
+        orig_chave = os.environ.get("GEMINI_API_KEY")
+        orig_urlopen = extrator_ia.urllib.request.urlopen
+        orig_sleep = extrator_ia.time.sleep
+        chamadas = []
+        pausas = []
+        esperado = [{"nome": "Café 500g", "preco": 19.9, "preco_de": None, "condicao": ""}]
+
+        class FalsaResposta:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+            def read(self):
+                payload = {"candidates": [{"finishReason": "STOP",
+                                           "content": {"parts": [{"text": json.dumps({"produtos": esperado})}]}}]}
+                return json.dumps(payload).encode("utf-8")
+
+        def falso_urlopen(req, timeout=None):
+            chamadas.append(req)
+            if len(chamadas) == 1:
+                raise urllib.error.HTTPError(req.full_url, 429, "Too Many Requests", {},
+                                             io.BytesIO(b"Rate limit exceeded"))
+            return FalsaResposta()
+
+        def falso_sleep(segundos):
+            pausas.append(segundos)
+
+        try:
+            extrator_ia._fila[:] = ["gemini-x-flash"]
+            extrator_ia._principal[:] = ["gemini-x-flash"]
+            extrator_ia._ultima_chamada[0] = 0.0
+            os.environ["GEMINI_API_KEY"] = "chave-teste"
+            extrator_ia.urllib.request.urlopen = falso_urlopen
+            extrator_ia.time.sleep = falso_sleep
+            resultado = extrator_ia._chamar_gemini(b"x", "image/png")
+        finally:
+            extrator_ia._fila[:] = orig_fila
+            extrator_ia._principal[:] = orig_principal
+            extrator_ia._ultima_chamada[0] = orig_ultima
+            if orig_chave is None:
+                os.environ.pop("GEMINI_API_KEY", None)
+            else:
+                os.environ["GEMINI_API_KEY"] = orig_chave
+            extrator_ia.urllib.request.urlopen = orig_urlopen
+            extrator_ia.time.sleep = orig_sleep
+
+        self.assertEqual(len(chamadas), 2)
+        self.assertIn(60, pausas)
+        self.assertEqual(resultado, esperado)
 
     def test_pdf_que_estoura_o_tempo_nao_e_cortado(self):
         from coletores import extrator_ia
